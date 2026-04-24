@@ -13,6 +13,7 @@ const EARTH_TEXTURE_URL = "/assets/earth-blue-marble-april.jpg";
 const MOON_MODEL_URL = "/assets/moon_nasa_lro_small.glb";
 const EARTH = new THREE.Vector3(-3.55, -0.1, 0);
 const MOON = new THREE.Vector3(4.75, 0.18, -1.1);
+const BASE_PLAYBACK_RATE = 4.35;
 
 const milestones = [
   ["launch", 0, "Launch", "Apr 1", "Big rocket, careful start", "SLS lifted Orion and four astronauts away from Earth.", "Artemis II began with a giant rocket lifting Orion away from Earth. The rocket did the hard first push, like throwing a ball high enough that it can start a long trip."],
@@ -25,95 +26,102 @@ const milestones = [
   ["splashdown", 100, "Splashdown", "Apr 10", "Back in the ocean", "Parachutes slowed Orion for ocean recovery.", "At the end, parachutes opened and slowed Orion down. It splashed into the ocean where recovery teams met the astronauts."],
 ].map(([id, t, label, day, title, short, dialog]) => ({ id, t, label, day, title, short, dialog }));
 
-const concepts = [
-  ["Trajectory", "A trajectory is the path an object follows through 3D space. Here it curves above, behind, and around Earth and the Moon."],
-  ["Free return", "A path that uses gravity to bring Orion home without needing a huge extra engine burn."],
-  ["Flyby", "A close pass around the Moon. Artemis II tests the crew spacecraft without landing."],
-];
-
-const briefingIntel = {
-  launch: ["Watch the rocket hand Orion its first giant push away from Earth.", "The mission starts by building enough speed and height to safely reach orbit.", "Find Earth first, then look for Orion just outside the bright atmosphere."],
-  orbit: ["Look for Orion looping close to Earth before it commits to deep space.", "Staying close gives the crew and ground teams time to check every major system.", "Pause here and compare the small spacecraft to the size of Earth."],
-  tli: ["Watch for the bright engine plume as Orion leaves Earth orbit.", "One carefully timed burn changes the whole path from orbiting Earth to coasting toward the Moon.", "Switch to Follow view and see how the ship points along the curved path."],
-  coast: ["The ship is mostly gliding while tiny corrections keep the target lined up.", "Spacecraft often travel by coasting after a burn instead of firing engines all the time.", "Use the scrubber slowly here and notice that the path is not a flat circle."],
-  flyby: ["Orion passes the Moon without landing and lets lunar gravity bend its route.", "This close pass is the mission's big deep-space navigation test.", "Switch to Moon view and watch how the return loop wraps around the Moon."],
-  return: ["The path is already aimed back toward Earth, even without a huge rescue burn.", "A free-return style path gives the crew a safer way home if something goes wrong.", "Follow the yellow trail back from the Moon toward Earth."],
-  entry: ["The crew module meets Earth's atmosphere at very high speed.", "Air acts like a brake, turning speed into heat before parachutes can work.", "Look for the orange entry glow around Orion near Earth."],
-  splashdown: ["The mission ends over the ocean where recovery teams can reach Orion.", "Water recovery gives a wide, forgiving landing area after the long trip home.", "Scrub back to launch and compare the full path from start to finish."],
+const observationNotes = {
+  launch: ["Crew ascent", "The astronauts ride through the highest-load part of the mission while Orion and ground teams confirm the spacecraft is healthy."],
+  orbit: ["Crew checks", "Near Earth, the crew tests communications, displays, suit interfaces, and life-support routines before committing to deep space."],
+  tli: ["Leaving home", "The team feels a short, decisive engine burn that changes their route from Earth orbit toward the Moon."],
+  coast: ["Deep-space routine", "For several days, the astronauts monitor Orion, rehearse procedures, sleep, eat, and keep in contact with Mission Control."],
+  flyby: ["Far from Earth", "The crew passes around the Moon without landing, seeing Earth as a distant world while Orion uses lunar gravity to turn home."],
+  return: ["Homeward arc", "On the way back, the astronauts keep checking navigation and spacecraft systems while Earth grows larger ahead."],
+  entry: ["Re-entry workload", "The crew prepares for high heat, high g-forces, and the fast transition from spaceflight to parachute descent."],
+  splashdown: ["Recovery team", "After splashdown, the astronauts wait for recovery crews to secure Orion and bring them safely out of the capsule."],
 };
 
+const sceneCards = [
+  ["launch", "cardLaunch"],
+  ["orbit", "cardOrbit"],
+  ["tli", "cardTli"],
+  ["coast", "cardCoast"],
+  ["flyby", "cardFlyby"],
+  ["return", "cardReturn"],
+  ["entry", "cardEntry"],
+].map(([id, className], index) => ({ ...milestones.find((item) => item.id === id), className, number: index + 1 }));
+
 document.querySelector("#root").innerHTML = `
-  <main class="shell">
-    <section class="stagePanel">
-      <div class="stageHeader">
-        <div><p class="eyebrow">Artemis II 3D mission scene</p><h1>See Orion curve through space</h1></div>
-        <div class="statusPill"><span id="activeDay"></span><strong id="activeLabel"></strong></div>
-      </div>
-      <div class="stageFrame">
-        <div id="game" aria-label="Three.js 3D Artemis II trajectory scene"></div>
-        <div class="sceneCaption"><strong id="captionTitle"></strong><span id="captionShort"></span></div>
-        <button class="fullscreenButton" type="button" id="fullscreenButton" aria-label="Enter fullscreen" title="Fullscreen">
+  <main class="missionShell">
+    <section class="stageFrame" id="stageFrame" aria-label="Interactive Artemis II mission explorer">
+      <div id="game" aria-label="Three.js 3D Artemis II trajectory scene"></div>
+      <header class="missionHeader">
+        <div class="departmentMark"><span></span><p>Departamento de Astronomia<br>Universidad de Concepcion</p></div>
+        <h1>Artemis II Mission Explorer</h1>
+      </header>
+      <div class="topTools" aria-label="Scene tools">
+        <button class="roundButton" type="button" id="infoButton" aria-label="Mission information" title="Mission information">i</button>
+        <label class="roundSelect" title="Camera view"><span>View</span><select id="viewSelect" aria-label="Camera view"><option value="cinematic" selected>Cinematic</option><option value="follow">Follow</option><option value="earth">Earth</option><option value="moon">Moon</option><option value="manual">Manual</option></select></label>
+        <button class="roundButton fullscreenButton" type="button" id="fullscreenButton" aria-label="Enter fullscreen" title="Fullscreen">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5h2V5h3V3Zm8 0v2h3v3h2V3h-5ZM5 16H3v5h5v-2H5v-3Zm14 3h-3v2h5v-5h-2v3Z" /></svg>
         </button>
       </div>
-      <div class="controls" aria-label="Playback controls">
-        <button class="iconButton" type="button" id="playButton" aria-label="Pause">Pause</button>
-        <button class="iconButton" type="button" id="restartButton" aria-label="Restart">Restart</button>
-        <button class="iconButton" type="button" id="prevButton" aria-label="Previous milestone">Prev</button>
-        <button class="iconButton" type="button" id="nextButton" aria-label="Next milestone">Next</button>
-        <div class="scrubberWrap">
+      <div class="sceneCards" aria-label="Mission event annotations">
+        ${sceneCards.map((item) => `
+          <button class="sceneCard ${item.className}" data-jump="${item.id}" type="button" aria-label="Jump to ${item.label}">
+            <span>${item.number}</span>
+            <strong>${item.label}</strong>
+            <em>${item.day}</em>
+            <p>${item.short}</p>
+          </button>
+        `).join("")}
+      </div>
+      <aside class="observationPanel" id="observationPanel" aria-label="Observation note">
+        <div class="observationHeader">
+          <h2>Observation Note</h2>
+          <button class="collapseButton" type="button" id="noteCollapseButton" aria-label="Collapse observation note" title="Collapse note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10h10v4H7v-4Z" /></svg>
+          </button>
+        </div>
+        <article>
+          <span id="noteNumber">1</span>
+          <div><strong id="noteTitle"></strong><p id="noteBody"></p></div>
+        </article>
+      </aside>
+      <div class="missionConsole" aria-label="Playback controls">
+        <button class="playButton" type="button" id="playButton" aria-label="Pause">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path id="playIcon" d="M8 5v14l11-7L8 5Z" /></svg>
+        </button>
+        <div class="metReadout"><span>MET</span><strong id="metTime">01:12:43:18</strong><em id="activeDay">Day 1</em></div>
+        <div class="timelineRail">
           <input class="scrubber" id="scrubber" type="range" min="0" max="${DURATION}" step="0.1" aria-label="Mission playback timeline" />
           <div class="timelineMarkers" id="timelineMarkers"></div>
         </div>
-        <label class="speedControl"><span>Speed</span><select id="speedSelect" aria-label="Playback speed"><option value="0.6">0.6x</option><option value="1" selected>1x</option><option value="1.6">1.6x</option><option value="2.4">2.4x</option></select></label>
-        <label class="speedControl"><span>View</span><select id="viewSelect" aria-label="Camera view"><option value="cinematic" selected>Cinematic</option><option value="follow">Follow</option><option value="earth">Earth</option><option value="moon">Moon</option><option value="manual">Manual</option></select></label>
+        <div class="nextMoment">
+          <span>Next Key Moment</span>
+          <strong id="nextMomentLabel"></strong>
+          <em id="nextMomentEta"></em>
+          <button type="button" id="nextButton" aria-label="Next key moment">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h3v14H5V5Zm5 0 9 7-9 7V5Z" /></svg>
+          </button>
+        </div>
+        <button class="followButton" type="button" id="followButton" aria-label="Follow Orion"><span></span>Follow Orion</button>
+      </div>
+      <div class="utilityControls">
+        <button type="button" id="prevButton">Prev</button>
+        <button type="button" id="restartButton">Restart</button>
+        <label>Speed<select id="speedSelect" aria-label="Playback speed"><option value="0.6">0.6x</option><option value="1" selected>1x</option><option value="1.6">1.6x</option><option value="2.4">2.4x</option></select></label>
       </div>
     </section>
-    <aside class="learningPanel intelPanel" aria-label="Mission intelligence panel">
-      <div class="intelHeader">
-        <div><p class="eyebrow">Mission intelligence</p><h2>Flight Director</h2></div>
-        <span class="completePill">Animation v1 complete</span>
-      </div>
-      <div class="modeSwitch" aria-label="Briefing mode">
-        <button type="button" id="holdBriefingButton">Hold briefing</button>
-        <button type="button" id="syncBriefingButton">Follow Orion</button>
-      </div>
-      <article class="briefingCard">
-        <div class="briefingMeta">
-          <span id="briefingDay"></span>
-          <strong id="briefingLabel"></strong>
-          <em id="briefingModeLabel"></em>
-        </div>
-        <h3 id="briefingTitle"></h3>
-        <p id="briefingText"></p>
-        <div class="briefingGrid">
-          <article><span>Watch</span><p id="watchText"></p></article>
-          <article><span>Why it matters</span><p id="whyText"></p></article>
-          <article><span>Try this</span><p id="tryText"></p></article>
-        </div>
-        <div class="briefingActions">
-          <button class="iconButton muted" type="button" id="briefingPrevButton">Prev briefing</button>
-          <button class="iconButton muted" type="button" id="briefingNextButton">Next briefing</button>
-        </div>
-      </article>
-      <div class="conceptList">${concepts.map(([title, body]) => `<article class="conceptCard"><div class="conceptIcon"></div><div><h3>${title}</h3><p>${body}</p></div></article>`).join("")}</div>
-      <p class="sourceNote">Reference: NASA SVS flight-derived trajectory, NASA AROW ephemeris, and NASA Artemis II press kit. Distances are compressed for screen learning.</p>
-      <div class="missionList" id="missionList"></div>
-    </aside>
   </main>
 `;
 
 const dom = Object.fromEntries(
-  ["activeDay", "activeLabel", "captionTitle", "captionShort", "briefingDay", "briefingLabel", "briefingModeLabel", "briefingTitle", "briefingText", "watchText", "whyText", "tryText", "holdBriefingButton", "syncBriefingButton", "briefingPrevButton", "briefingNextButton", "scrubber", "playButton", "restartButton", "prevButton", "nextButton", "speedSelect", "viewSelect", "fullscreenButton", "timelineMarkers", "missionList"].map((id) => [id, document.querySelector(`#${id}`)])
+  ["activeDay", "metTime", "nextMomentLabel", "nextMomentEta", "noteNumber", "noteTitle", "noteBody", "noteCollapseButton", "observationPanel", "scrubber", "playButton", "playIcon", "restartButton", "prevButton", "nextButton", "speedSelect", "viewSelect", "followButton", "fullscreenButton", "timelineMarkers"].map((id) => [id, document.querySelector(`#${id}`)])
 );
 
 const state = {
-  time: clamp(Number(localStorage.getItem("artemis-three-time") || 0), 0, DURATION),
-  playing: true,
+  time: clamp(Number(localStorage.getItem("artemis-three-time") || 42), 0, DURATION),
+  playing: localStorage.getItem("artemis-three-playing") !== "false",
   speed: 1,
   view: localStorage.getItem("artemis-three-view") || "cinematic",
-  briefingMode: localStorage.getItem("artemis-briefing-mode") || "hold",
-  selectedId: localStorage.getItem("artemis-briefing-id") || "launch",
+  notesCollapsed: localStorage.getItem("artemis-notes-collapsed") === "true",
 };
 
 // Screen-compressed schematic, shaped from official NASA Artemis II references:
@@ -146,23 +154,23 @@ const curve = new THREE.CatmullRomCurve3(
 const pathPoints = curve.getSpacedPoints(980);
 
 let trail = null;
-let activeLabel = null;
-let lastActiveId = null;
 let composer = null;
 const markerRefs = [];
+const sceneCardRefs = [];
 
-dom.timelineMarkers.innerHTML = milestones.map((item) => `<button class="marker" data-jump="${item.id}" style="left:${item.t}%" type="button" aria-label="Jump to ${item.label}"><span>${item.label}</span></button>`).join("");
-dom.missionList.innerHTML = milestones.map((item) => `<button class="missionItem" data-briefing="${item.id}" type="button"><span>${item.day}</span><strong>${item.label}</strong><em></em></button>`).join("");
+dom.timelineMarkers.innerHTML = milestones.slice(0, -1).map((item, index) => `<button class="marker" data-jump="${item.id}" style="left:${item.t}%" type="button" aria-label="Jump to ${item.label}"><span>${index + 1}</span><strong>${item.label}</strong><em>${item.day.replace("Flight ", "")}</em></button>`).join("");
 document.querySelectorAll("[data-jump]").forEach((button) => {
   const item = milestones.find((milestone) => milestone.id === button.dataset.jump);
   button.addEventListener("click", () => jumpTo(item.t, item.id));
 });
-document.querySelectorAll("[data-briefing]").forEach((button) => {
-  button.addEventListener("click", () => selectBriefing(button.dataset.briefing));
+document.querySelectorAll(".sceneCard").forEach((element) => {
+  const item = milestones.find((milestone) => milestone.id === element.dataset.jump);
+  if (item) sceneCardRefs.push({ element, item });
 });
 dom.scrubber.addEventListener("input", (event) => setTime(Number(event.target.value), true));
 dom.playButton.addEventListener("click", () => {
   state.playing = !state.playing;
+  localStorage.setItem("artemis-three-playing", String(state.playing));
   updateDom();
 });
 dom.restartButton.addEventListener("click", () => jumpTo(0));
@@ -181,10 +189,16 @@ dom.viewSelect.addEventListener("change", (event) => {
   state.view = event.target.value;
   localStorage.setItem("artemis-three-view", state.view);
 });
-dom.holdBriefingButton.addEventListener("click", () => setBriefingMode("hold"));
-dom.syncBriefingButton.addEventListener("click", () => setBriefingMode("follow"));
-dom.briefingPrevButton.addEventListener("click", () => stepBriefing(-1));
-dom.briefingNextButton.addEventListener("click", () => stepBriefing(1));
+dom.followButton.addEventListener("click", () => {
+  state.view = state.view === "follow" ? "cinematic" : "follow";
+  localStorage.setItem("artemis-three-view", state.view);
+  updateDom();
+});
+dom.noteCollapseButton.addEventListener("click", () => {
+  state.notesCollapsed = !state.notesCollapsed;
+  localStorage.setItem("artemis-notes-collapsed", String(state.notesCollapsed));
+  updateDom();
+});
 dom.fullscreenButton.addEventListener("click", toggleFullscreen);
 document.addEventListener("fullscreenchange", () => {
   updateFullscreenButton();
@@ -196,14 +210,14 @@ document.addEventListener("webkitfullscreenchange", () => {
 });
 
 const mount = document.querySelector("#game");
-const stageFrame = document.querySelector(".stageFrame");
+const stageFrame = document.querySelector("#stageFrame");
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x050814);
 scene.fog = new THREE.Fog(0x050814, 11, 28);
 
 const camera = new THREE.PerspectiveCamera(39, 16 / 9, 0.1, 100);
-camera.position.set(-1.1, 5.35, 10.6);
-camera.lookAt(0.15, -0.08, 0.15);
+camera.position.set(0.05, 1.28, 7.85);
+camera.lookAt(0.1, 0.12, -0.28);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -217,7 +231,7 @@ orbit.enableDamping = true;
 orbit.dampingFactor = 0.08;
 orbit.minDistance = 6.5;
 orbit.maxDistance = 16;
-orbit.target.set(0.15, -0.08, 0.15);
+orbit.target.set(0.1, 0.12, -0.28);
 
 scene.add(new THREE.AmbientLight(0x9fb6ff, 0.46));
 const sun = new THREE.DirectionalLight(0xffffff, 2.45);
@@ -249,12 +263,13 @@ renderer.setAnimationLoop((now) => {
   const delta = (now - previous) / 1000;
   previous = now;
   if (state.playing) {
-    state.time = (state.time + delta * 5.8 * state.speed) % DURATION;
+    state.time = (state.time + delta * BASE_PLAYBACK_RATE * state.speed) % DURATION;
     localStorage.setItem("artemis-three-time", String(state.time.toFixed(2)));
     updateDom();
   }
   updateScene();
   orbit.update();
+  updateSceneCardLayout(milestones[activeIndex()].id);
   composer.render();
 });
 
@@ -304,7 +319,7 @@ function createPlanets() {
   earthMap.colorSpace = THREE.SRGBColorSpace;
   earthMap.anisotropy = 8;
   const earth = new THREE.Mesh(
-    new THREE.SphereGeometry(0.95, 96, 96),
+    new THREE.SphereGeometry(1.18, 96, 96),
     new THREE.MeshStandardMaterial({ map: earthMap, emissiveMap: earthMap, emissive: 0x17304a, emissiveIntensity: 0.18, roughness: 0.62, metalness: 0.02 })
   );
   earth.position.copy(EARTH);
@@ -312,14 +327,14 @@ function createPlanets() {
   scene.add(earth);
 
   const cloudShell = new THREE.Mesh(
-    new THREE.SphereGeometry(0.973, 96, 96),
+    new THREE.SphereGeometry(1.21, 96, 96),
     new THREE.MeshStandardMaterial({ map: createCloudTexture(), transparent: true, opacity: 0.18, roughness: 0.9, depthWrite: false })
   );
   cloudShell.position.copy(EARTH);
   scene.add(cloudShell);
 
   const atmosphere = new THREE.Mesh(
-    new THREE.SphereGeometry(1.08, 96, 96),
+    new THREE.SphereGeometry(1.34, 96, 96),
     new THREE.MeshBasicMaterial({ color: 0x68b7ff, transparent: true, opacity: 0.18, side: THREE.BackSide, blending: THREE.AdditiveBlending })
   );
   atmosphere.position.copy(EARTH);
@@ -329,7 +344,7 @@ function createPlanets() {
     new THREE.SpriteMaterial({ map: createRadialTexture("#74caff", "#1b79d8"), transparent: true, opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false })
   );
   earthGlow.position.copy(EARTH);
-  earthGlow.scale.set(2.65, 2.65, 1);
+  earthGlow.scale.set(3.22, 3.22, 1);
   scene.add(earthGlow);
 
   const moon = createMoonFallback();
@@ -659,14 +674,6 @@ function updateScene() {
     marker.mesh.scale.setScalar(activeScale);
     marker.glow.material.opacity = marker.id === active.id ? 0.78 : 0.38;
   });
-  if (active.id !== lastActiveId) {
-    lastActiveId = active.id;
-    if (activeLabel) scene.remove(activeLabel);
-    activeLabel = createLabel(active.label);
-    activeLabel.position.copy(pointAt(active.t / DURATION).add(new THREE.Vector3(0.22, 0.28, 0)));
-    scene.add(activeLabel);
-  }
-
   scene.userData.earth.rotation.y += 0.0022;
   scene.userData.cloudShell.rotation.y += 0.003;
   scene.userData.atmosphere.rotation.y += 0.0013;
@@ -682,8 +689,9 @@ function updateCamera(progress, point, tangent) {
   const safeSide = Math.abs(tangent.y) > 0.92 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize();
 
   if (state.view === "follow") {
-    target = point.clone().add(tangent.clone().multiplyScalar(0.38));
-    position = point.clone().add(tangent.clone().multiplyScalar(-2.45)).add(safeSide.multiplyScalar(1.4)).add(new THREE.Vector3(0, 1.18, 0.45));
+    const shot = cinematicFollowShot(milestones[activeIndex()].id, progress, point, tangent, safeSide);
+    target = shot.target;
+    position = shot.position;
   } else if (state.view === "earth") {
     target = EARTH.clone().lerp(point, 0.2);
     position = EARTH.clone().add(new THREE.Vector3(-0.75, 2.15, 4.35));
@@ -691,17 +699,78 @@ function updateCamera(progress, point, tangent) {
     target = MOON.clone().lerp(point, 0.25);
     position = MOON.clone().add(new THREE.Vector3(1.7, 1.65, 3.25));
   } else {
-    const lunarWeight = smoothstep(0.44, 0.66, progress) * (1 - smoothstep(0.74, 0.92, progress));
-    const earthReturn = smoothstep(0.76, 1, progress);
-    const anchor = EARTH.clone().lerp(MOON, lunarWeight).lerp(EARTH, earthReturn * 0.72);
-    target = anchor.lerp(point, 0.34 + Math.sin(progress * Math.PI) * 0.18);
-    const orbitAngle = progress * Math.PI * 1.58 + 0.8;
-    const distance = 5.9 + smoothstep(0.24, 0.62, progress) * 1.7 - smoothstep(0.82, 1, progress) * 0.8;
-    position = target.clone().add(new THREE.Vector3(Math.cos(orbitAngle) * distance, 2.55 + Math.sin(progress * Math.PI * 2) * 0.52, Math.sin(orbitAngle) * distance));
+    const shot = cinematicShot(milestones[activeIndex()].id, progress, point, tangent);
+    target = shot.target;
+    position = shot.position;
   }
 
   camera.position.lerp(position, 0.034);
   orbit.target.lerp(target, 0.055);
+}
+
+function cinematicShot(id, progress, point, tangent) {
+  const drift = new THREE.Vector3(
+    Math.sin(progress * Math.PI * 2.1) * 0.08,
+    Math.cos(progress * Math.PI * 1.7) * 0.06,
+    Math.sin(progress * Math.PI * 1.3) * 0.08
+  );
+  const shots = {
+    launch: {
+      target: EARTH.clone().lerp(point, 0.32).add(new THREE.Vector3(0.52, 0.18, -0.1)),
+      position: EARTH.clone().add(new THREE.Vector3(3.15, 2.16, 5.7)),
+    },
+    orbit: {
+      target: EARTH.clone().lerp(point, 0.36).add(new THREE.Vector3(0.42, 0.06, -0.18)),
+      position: EARTH.clone().add(new THREE.Vector3(3.35, 1.95, 5.35)),
+    },
+    tli: {
+      target: EARTH.clone().lerp(point, 0.46).add(new THREE.Vector3(0.38, 0.24, -0.12)),
+      position: EARTH.clone().add(new THREE.Vector3(4.35, 2.32, 4.85)),
+    },
+    coast: {
+      target: EARTH.clone().lerp(MOON, 0.46).lerp(point, 0.38).add(new THREE.Vector3(-0.1, 0.22, 0.08)),
+      position: EARTH.clone().lerp(MOON, 0.44).add(new THREE.Vector3(-2.55, 2.52, 6.75)),
+    },
+    flyby: {
+      target: MOON.clone().lerp(point, 0.42).lerp(EARTH, 0.12).add(new THREE.Vector3(-0.22, 0.18, 0.06)),
+      position: MOON.clone().add(new THREE.Vector3(-3.15, 2.18, 4.72)),
+    },
+    return: {
+      target: EARTH.clone().lerp(point, 0.46).add(new THREE.Vector3(-0.22, 0.16, -0.02)),
+      position: EARTH.clone().add(new THREE.Vector3(-2.75, 2.34, 6.08)),
+    },
+    entry: {
+      target: EARTH.clone().lerp(point, 0.34).add(new THREE.Vector3(0.42, 0.0, 0.12)),
+      position: EARTH.clone().add(new THREE.Vector3(2.55, 1.68, 4.36)),
+    },
+    splashdown: {
+      target: EARTH.clone().lerp(point, 0.28).add(new THREE.Vector3(0.2, 0.08, 0.12)),
+      position: EARTH.clone().add(new THREE.Vector3(2.25, 1.5, 4.4)),
+    },
+  };
+  const shot = shots[id] || shots.coast;
+  const forwardBreath = tangent.clone().multiplyScalar(0.08 * Math.sin(progress * Math.PI * 3.2));
+  return {
+    target: shot.target.add(drift.clone().multiplyScalar(0.45)).add(forwardBreath),
+    position: shot.position.add(drift),
+  };
+}
+
+function cinematicFollowShot(id, progress, point, tangent, safeSide) {
+  const systemAnchor = id === "flyby" || id === "coast"
+    ? EARTH.clone().lerp(MOON, id === "flyby" ? 0.72 : 0.5)
+    : EARTH.clone().lerp(point, id === "return" || id === "entry" ? 0.42 : 0.28);
+  const composed = cinematicShot(id, progress, point, tangent);
+  const chaseTarget = point.clone().add(tangent.clone().multiplyScalar(0.42)).lerp(systemAnchor, 0.28);
+  const chasePosition = point
+    .clone()
+    .add(tangent.clone().multiplyScalar(-3.25))
+    .add(safeSide.clone().multiplyScalar(2.05))
+    .add(new THREE.Vector3(0, 1.72, 0.82));
+  return {
+    target: composed.target.clone().lerp(chaseTarget, 0.52),
+    position: composed.position.clone().lerp(chasePosition, 0.48),
+  };
 }
 
 function enginePulse(time, centers = [0, 24, 42, 73], width = 3.2) {
@@ -800,25 +869,6 @@ function makeCanvasTexture(width, height, painter) {
   return texture;
 }
 
-function createLabel(text) {
-  const texture = makeCanvasTexture(512, 128, (ctx) => {
-    ctx.fillStyle = "rgba(7, 12, 22, 0.78)";
-    roundRect(ctx, 14, 26, 484, 76, 20);
-    ctx.fill();
-    ctx.strokeStyle = "#f6c453";
-    ctx.lineWidth = 5;
-    ctx.stroke();
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "700 34px Inter, Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, 256, 64);
-  });
-  const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
-  label.scale.set(1.22, 0.3, 1);
-  return label;
-}
-
 function resize() {
   const width = mount.clientWidth;
   const height = mount.clientHeight;
@@ -865,77 +915,102 @@ function activeIndex() {
 
 function setTime(time, pause = false) {
   state.time = clamp(time, 0, DURATION);
-  if (pause) state.playing = false;
+  if (pause) {
+    state.playing = false;
+    localStorage.setItem("artemis-three-playing", "false");
+  }
   localStorage.setItem("artemis-three-time", String(state.time.toFixed(2)));
   updateDom();
 }
 
 function jumpTo(time, id = null) {
-  if (id) selectBriefing(id, false);
+  if (id) localStorage.setItem("artemis-last-jump", id);
   setTime(time, true);
-}
-
-function selectBriefing(id, render = true) {
-  state.selectedId = id;
-  state.briefingMode = "hold";
-  localStorage.setItem("artemis-briefing-id", state.selectedId);
-  localStorage.setItem("artemis-briefing-mode", state.briefingMode);
-  if (render) updateDom();
-}
-
-function setBriefingMode(mode) {
-  state.briefingMode = mode;
-  if (mode === "follow") state.selectedId = milestones[activeIndex()].id;
-  localStorage.setItem("artemis-briefing-mode", state.briefingMode);
-  localStorage.setItem("artemis-briefing-id", state.selectedId);
-  updateDom();
-}
-
-function stepBriefing(direction) {
-  const selected = selectedIndex();
-  const next = milestones[clamp(selected + direction, 0, milestones.length - 1)];
-  selectBriefing(next.id);
 }
 
 function updateDom() {
   const active = milestones[activeIndex()];
-  if (state.briefingMode === "follow") state.selectedId = active.id;
-  const briefing = selectedMilestone();
-  const [watch, why, task] = briefingIntel[briefing.id];
-  dom.activeDay.textContent = active.day;
-  dom.activeLabel.textContent = active.label;
-  dom.captionTitle.textContent = active.title;
-  dom.captionShort.textContent = active.short;
-  dom.briefingDay.textContent = briefing.day;
-  dom.briefingLabel.textContent = briefing.label;
-  dom.briefingModeLabel.textContent = briefing.id === active.id ? "Now in view" : "Briefing held";
-  dom.briefingTitle.textContent = briefing.title;
-  dom.briefingText.textContent = briefing.dialog;
-  dom.watchText.textContent = watch;
-  dom.whyText.textContent = why;
-  dom.tryText.textContent = task;
+  const activeNote = observationNotes[active.id] || observationNotes.coast;
+  const next = milestones.find((item) => item.t > state.time) || milestones[milestones.length - 1];
+  const eta = Math.max(0, next.t - state.time);
+  dom.activeDay.textContent = missionDayLabel(state.time);
+  dom.metTime.textContent = metFromTime(state.time);
+  dom.nextMomentLabel.textContent = next.label;
+  dom.nextMomentEta.textContent = eta === 0 ? "now" : `in ${eta.toFixed(0)} mission units`;
+  dom.noteNumber.textContent = String(activeIndex() + 1);
+  dom.noteTitle.textContent = activeNote[0];
+  dom.noteBody.textContent = activeNote[1];
   dom.scrubber.value = String(state.time);
-  dom.playButton.textContent = state.playing ? "Pause" : "Play";
   dom.playButton.setAttribute("aria-label", state.playing ? "Pause" : "Play");
+  dom.playIcon.setAttribute("d", state.playing ? "M7 5h4v14H7V5Zm6 0h4v14h-4V5Z" : "M8 5v14l11-7L8 5Z");
   dom.viewSelect.value = state.view;
-  dom.holdBriefingButton.classList.toggle("active", state.briefingMode === "hold");
-  dom.syncBriefingButton.classList.toggle("active", state.briefingMode === "follow");
-  dom.briefingPrevButton.disabled = selectedIndex() === 0;
-  dom.briefingNextButton.disabled = selectedIndex() === milestones.length - 1;
-  document.querySelectorAll("[data-jump]").forEach((button) => button.classList.toggle("active", button.dataset.jump === active.id));
-  document.querySelectorAll("[data-briefing]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.briefing === active.id);
-    button.classList.toggle("selected", button.dataset.briefing === briefing.id);
-    button.querySelector("em").textContent = button.dataset.briefing === active.id ? "in view" : "";
+  dom.followButton.classList.toggle("active", state.view === "follow");
+  dom.observationPanel.classList.toggle("collapsed", state.notesCollapsed);
+  dom.noteCollapseButton.setAttribute("aria-label", state.notesCollapsed ? "Expand observation note" : "Collapse observation note");
+  dom.noteCollapseButton.title = state.notesCollapsed ? "Expand note" : "Collapse note";
+  document.querySelectorAll("[data-jump]").forEach((button) => {
+    const item = milestones.find((milestone) => milestone.id === button.dataset.jump);
+    const isActive = button.dataset.jump === active.id;
+    button.classList.toggle("active", isActive);
+    if (button.classList.contains("sceneCard")) {
+      const visibility = sceneCardVisibility(item, active.id);
+      button.classList.toggle("visible", visibility.visible);
+      button.style.setProperty("--card-delay", `${visibility.delay}ms`);
+    }
   });
 }
 
-function selectedMilestone() {
-  return milestones.find((item) => item.id === state.selectedId) || milestones[activeIndex()];
+function sceneCardVisibility(item, activeId) {
+  if (!item) return { visible: false, delay: 0 };
+  const active = item.id === activeId;
+  const card = sceneCards.find((candidate) => candidate.id === item.id);
+  return { visible: active, delay: card ? 90 : 0 };
 }
 
-function selectedIndex() {
-  return milestones.findIndex((item) => item.id === selectedMilestone().id);
+function updateSceneCardLayout(activeId) {
+  const width = stageFrame.clientWidth;
+  const height = stageFrame.clientHeight;
+  if (!width || !height) return;
+  sceneCardRefs.forEach(({ element, item }) => {
+    const isActive = item.id === activeId;
+    const placed = activeCardSlot(item.id, width, height);
+    element.style.setProperty("--card-x", `${placed.x}px`);
+    element.style.setProperty("--card-y", `${placed.y}px`);
+    element.classList.toggle("offscreen", !isActive);
+  });
+}
+
+function activeCardSlot(id, width, height) {
+  const consoleTop = height - 156;
+  const headerBottom = 150;
+  const slots = {
+    launch: [0.72, 0.42],
+    orbit: [0.72, 0.52],
+    tli: [0.7, 0.6],
+    coast: [0.52, 0.3],
+    flyby: [0.27, 0.44],
+    return: [0.69, 0.36],
+    entry: [0.72, 0.46],
+    splashdown: [0.33, 0.42],
+  };
+  const [xRatio, yRatio] = slots[id] || [0.66, 0.42];
+  return {
+    x: clamp(width * xRatio, 165, width - 165),
+    y: clamp(height * yRatio, headerBottom + 72, consoleTop - 74),
+  };
+}
+
+function metFromTime(time) {
+  const totalHours = Math.round((time / DURATION) * 10 * 24);
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  const minutes = Math.floor((time * 37) % 60);
+  const seconds = Math.floor((time * 113) % 60);
+  return `${String(days).padStart(2, "0")}:${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function missionDayLabel(time) {
+  return `DAY ${Math.max(0, Math.floor((time / DURATION) * 10))}`;
 }
 
 function smoothstep(edge0, edge1, value) {
@@ -945,14 +1020,4 @@ function smoothstep(edge0, edge1, value) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
-}
-
-function roundRect(ctx, x, y, width, height, radius) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.arcTo(x + width, y, x + width, y + height, radius);
-  ctx.arcTo(x + width, y + height, x, y + height, radius);
-  ctx.arcTo(x, y + height, x, y, radius);
-  ctx.arcTo(x, y, x + width, y, radius);
-  ctx.closePath();
 }
