@@ -173,7 +173,7 @@ h3 {
 
 .controls {
   display: grid;
-  grid-template-columns: repeat(4, minmax(64px, 78px)) minmax(220px, 1fr) auto;
+  grid-template-columns: repeat(4, minmax(64px, 78px)) minmax(220px, 1fr) auto auto;
   gap: 10px;
   align-items: center;
   border: 1px solid rgba(150, 176, 210, 0.24);
@@ -285,6 +285,11 @@ h3 {
   background: transparent;
 }
 
+.speedControl select:focus-visible {
+  outline: 2px solid rgba(246, 196, 83, 0.72);
+  outline-offset: 4px;
+}
+
 .learningPanel {
   display: flex;
   flex-direction: column;
@@ -292,8 +297,9 @@ h3 {
   border: 1px solid rgba(150, 176, 210, 0.24);
   border-radius: 8px;
   padding: 16px;
-  background: rgba(8, 15, 30, 0.78);
+  background: rgba(8, 15, 30, 0.93);
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(18px);
 }
 
 .dialog {
@@ -318,6 +324,15 @@ h3 {
 .missionList {
   display: grid;
   gap: 10px;
+}
+
+.sourceNote {
+  margin: 0;
+  border-top: 1px solid rgba(142, 214, 209, 0.14);
+  padding-top: 12px;
+  color: #aebccc;
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .conceptCard {

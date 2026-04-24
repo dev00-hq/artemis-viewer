@@ -1,5 +1,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import "./styles.css";
 
 const DURATION = 100;
@@ -7,14 +10,14 @@ const EARTH = new THREE.Vector3(-3.55, -0.1, 0);
 const MOON = new THREE.Vector3(4.75, 0.18, -1.1);
 
 const milestones = [
-  ["launch", 0, "Launch", "Day 1", "Big rocket, careful start", "SLS lifts Orion and four astronauts away from Earth.", "Artemis II starts with a giant rocket lifting Orion away from Earth. The rocket does the hard first push, like throwing a ball high enough that it can start a long trip."],
-  ["orbit", 13, "Earth checkouts", "Day 1", "Practice close to home", "Orion circles Earth while teams check the spacecraft.", "Before going far away, Orion stays near Earth. The crew and Mission Control check steering, power, air, computers, and communication."],
-  ["tli", 24, "Moon burn", "Day 1", "The push toward the Moon", "A long engine burn sends Orion onto its Moon path.", "This is the big push that changes Orion from circling Earth to flying toward the Moon. Spacecraft do not need engines on all the time; one well-timed push can do a lot."],
-  ["coast", 42, "Deep-space coast", "Days 2-4", "Tiny nudges, huge distance", "Small correction burns keep Orion on target.", "During the coast, Orion is mostly gliding. Small engine nudges help keep it on the right invisible road through space."],
-  ["flyby", 58, "Lunar flyby", "Day 5", "Around the far side", "The Moon bends Orion's path into a return loop.", "Orion does not land on Artemis II. It swings around the Moon, and the Moon's gravity bends the path so Orion can head back toward Earth."],
-  ["return", 73, "Free return", "Days 6-8", "Gravity helps bring Orion home", "The route naturally carries Orion back toward Earth.", "A free-return path is clever because gravity helps do the navigation. It is safer because the path already points Orion back home."],
-  ["entry", 90, "Skip entry", "Day 9", "Skimming the air", "Orion slows down using Earth's atmosphere.", "Coming back from the Moon is fast. Orion can skim the top of the air, rise a little, then dip in again so heat and force are easier to handle."],
-  ["splashdown", 100, "Splashdown", "Day 10", "Back in the ocean", "Parachutes slow Orion for ocean recovery.", "At the end, parachutes open and slow Orion down. It splashes into the ocean where recovery teams meet the astronauts."],
+  ["launch", 0, "Launch", "Apr 1", "Big rocket, careful start", "SLS lifted Orion and four astronauts away from Earth.", "Artemis II began with a giant rocket lifting Orion away from Earth. The rocket did the hard first push, like throwing a ball high enough that it can start a long trip."],
+  ["orbit", 13, "Earth checkouts", "Flight day 1", "Practice close to home", "Orion circled Earth while teams checked the spacecraft.", "Before going far away, Orion stayed near Earth. The crew and Mission Control checked steering, power, air, computers, and communication."],
+  ["tli", 24, "Moon burn", "Flight day 2", "The push toward the Moon", "A long engine burn sent Orion onto its Moon path.", "This was the big push that changed Orion from circling Earth to flying toward the Moon. Spacecraft do not need engines on all the time; one well-timed push can do a lot."],
+  ["coast", 42, "Deep-space coast", "Flight days 3-5", "Tiny nudges, huge distance", "Small correction burns kept Orion on target.", "During the coast, Orion mostly glided. Small engine nudges helped keep it on the right invisible road through space."],
+  ["flyby", 58, "Lunar flyby", "Flight day 6", "Around the far side", "The Moon bent Orion's path into a return loop.", "Orion did not land on Artemis II. It swung around the Moon, and the Moon's gravity bent the path so Orion could head back toward Earth."],
+  ["return", 73, "Free return", "Flight days 7-9", "Gravity helps bring Orion home", "The route naturally carried Orion back toward Earth.", "A free-return path is clever because gravity helps do the navigation. It is safer because the path already points Orion back home."],
+  ["entry", 90, "Entry", "Flight day 10", "Skimming the air", "Orion slowed down using Earth's atmosphere.", "Coming back from the Moon is fast. Orion skimmed into the top of the air so heat and force could slow the crew module down."],
+  ["splashdown", 100, "Splashdown", "Apr 10", "Back in the ocean", "Parachutes slowed Orion for ocean recovery.", "At the end, parachutes opened and slowed Orion down. It splashed into the ocean where recovery teams met the astronauts."],
 ].map(([id, t, label, day, title, short, dialog]) => ({ id, t, label, day, title, short, dialog }));
 
 const concepts = [
@@ -44,31 +47,35 @@ document.querySelector("#root").innerHTML = `
           <div class="timelineMarkers" id="timelineMarkers"></div>
         </div>
         <label class="speedControl"><span>Speed</span><select id="speedSelect" aria-label="Playback speed"><option value="0.6">0.6x</option><option value="1" selected>1x</option><option value="1.6">1.6x</option><option value="2.4">2.4x</option></select></label>
+        <label class="speedControl"><span>View</span><select id="viewSelect" aria-label="Camera view"><option value="cinematic" selected>Cinematic</option><option value="follow">Follow</option><option value="earth">Earth</option><option value="moon">Moon</option><option value="manual">Manual</option></select></label>
       </div>
     </section>
     <aside class="learningPanel" aria-label="Mission explanation panel">
       <div class="dialogHeader"><div><p class="eyebrow">Kid-friendly mission notes</p><h2 id="dialogTitle"></h2></div><button class="iconButton muted" id="dialogToggle" type="button" aria-label="Toggle explanation">Info</button></div>
       <div class="dialog" id="dialog"><div class="bookIcon">?</div><p id="dialogText"></p></div>
       <div class="conceptList">${concepts.map(([title, body]) => `<article class="conceptCard"><div class="conceptIcon"></div><div><h3>${title}</h3><p>${body}</p></div></article>`).join("")}</div>
+      <p class="sourceNote">Reference: NASA SVS flight-derived trajectory, NASA AROW ephemeris, and NASA Artemis II press kit. Distances are compressed for screen learning.</p>
       <div class="missionList" id="missionList"></div>
     </aside>
   </main>
 `;
 
 const dom = Object.fromEntries(
-  ["activeDay", "activeLabel", "captionTitle", "captionShort", "dialogTitle", "dialogText", "dialog", "dialogToggle", "scrubber", "playButton", "restartButton", "prevButton", "nextButton", "speedSelect", "timelineMarkers", "missionList"].map((id) => [id, document.querySelector(`#${id}`)])
+  ["activeDay", "activeLabel", "captionTitle", "captionShort", "dialogTitle", "dialogText", "dialog", "dialogToggle", "scrubber", "playButton", "restartButton", "prevButton", "nextButton", "speedSelect", "viewSelect", "timelineMarkers", "missionList"].map((id) => [id, document.querySelector(`#${id}`)])
 );
 
 const state = {
   time: clamp(Number(localStorage.getItem("artemis-three-time") || 0), 0, DURATION),
   playing: true,
   speed: 1,
+  view: localStorage.getItem("artemis-three-view") || "cinematic",
   dialogOpen: true,
 };
 
-// Schematic, not ephemeris-grade: shaped from NASA Artemis II mission map/press kit.
-// Key constraints represented here: high Earth-orbit checkout, TLI on Flight Day 2,
-// roughly four days outbound, far-side lunar flyby, and fuel-efficient free return.
+// Screen-compressed schematic, shaped from official NASA Artemis II references:
+// SVS flight-derived trajectory visualization, AROW ephemeris availability, and the
+// press kit timeline: high Earth checkout, Flight Day 2 TLI, Flight Day 6 lunar
+// flyby, fuel-efficient free return, and Flight Day 10 entry/splashdown.
 const curve = new THREE.CatmullRomCurve3(
   [
     new THREE.Vector3(-4.2, -0.16, 1.16),
@@ -90,14 +97,14 @@ const curve = new THREE.CatmullRomCurve3(
     new THREE.Vector3(-5.1, -1.25, -0.95),
   ],
   false,
-  "catmullrom",
-  0.45
+  "centripetal"
 );
 const pathPoints = curve.getSpacedPoints(980);
 
 let trail = null;
 let activeLabel = null;
 let lastActiveId = null;
+let composer = null;
 const markerRefs = [];
 
 dom.timelineMarkers.innerHTML = milestones.map((item) => `<button class="marker" data-milestone="${item.id}" style="left:${item.t}%" type="button" aria-label="Jump to ${item.label}"><span>${item.label}</span></button>`).join("");
@@ -117,6 +124,10 @@ dom.nextButton.addEventListener("click", () => jumpTo(milestones[clamp(activeInd
 dom.speedSelect.addEventListener("change", (event) => {
   state.speed = Number(event.target.value);
 });
+dom.viewSelect.addEventListener("change", (event) => {
+  state.view = event.target.value;
+  localStorage.setItem("artemis-three-view", state.view);
+});
 dom.dialogToggle.addEventListener("click", () => {
   state.dialogOpen = !state.dialogOpen;
   updateDom();
@@ -127,15 +138,15 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x050814);
 scene.fog = new THREE.Fog(0x050814, 11, 28);
 
-const camera = new THREE.PerspectiveCamera(42, 16 / 9, 0.1, 100);
-camera.position.set(0, 4.7, 11.7);
-camera.lookAt(0.35, -0.04, 0);
+const camera = new THREE.PerspectiveCamera(39, 16 / 9, 0.1, 100);
+camera.position.set(-1.1, 5.35, 10.6);
+camera.lookAt(0.15, -0.08, 0.15);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.08;
+renderer.toneMappingExposure = 1.0;
 mount.appendChild(renderer.domElement);
 
 const orbit = new OrbitControls(camera, renderer.domElement);
@@ -143,7 +154,7 @@ orbit.enableDamping = true;
 orbit.dampingFactor = 0.08;
 orbit.minDistance = 6.5;
 orbit.maxDistance = 16;
-orbit.target.set(0.35, -0.05, 0);
+orbit.target.set(0.15, -0.08, 0.15);
 
 scene.add(new THREE.AmbientLight(0x9fb6ff, 0.46));
 const sun = new THREE.DirectionalLight(0xffffff, 2.45);
@@ -154,14 +165,21 @@ rim.position.set(6, -2, -5);
 scene.add(rim);
 
 createStars();
+createSun();
 createPlanets();
 createReferenceRings();
+createDepthCues();
 createTrajectory();
 const orion = createOrion();
 scene.add(orion);
 createMarkers();
 resize();
 window.addEventListener("resize", resize);
+
+composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(mount.clientWidth, mount.clientHeight), 0.24, 0.42, 0.68);
+composer.addPass(bloom);
 
 let previous = performance.now();
 renderer.setAnimationLoop((now) => {
@@ -174,31 +192,77 @@ renderer.setAnimationLoop((now) => {
   }
   updateScene();
   orbit.update();
-  renderer.render(scene, camera);
+  composer.render();
 });
 
 updateDom();
 
 function createStars() {
-  const positions = new Float32Array(540);
-  for (let i = 0; i < 180; i += 1) {
-    positions[i * 3] = ((i * 131) % 1200) / 60 - 10;
-    positions[i * 3 + 1] = ((i * 71) % 620) / 62 - 5;
-    positions[i * 3 + 2] = ((i * 197) % 900) / 60 - 9;
+  const positions = new Float32Array(900);
+  const colors = new Float32Array(900);
+  for (let i = 0; i < 300; i += 1) {
+    positions[i * 3] = ((i * 131) % 1600) / 64 - 12.5;
+    positions[i * 3 + 1] = ((i * 71) % 900) / 74 - 6;
+    positions[i * 3 + 2] = ((i * 197) % 1400) / 66 - 13;
+    const warmth = (i * 29) % 100 > 76 ? 0.12 : 0;
+    colors[i * 3] = 0.82 + warmth;
+    colors[i * 3 + 1] = 0.9 + warmth * 0.35;
+    colors[i * 3 + 2] = 1;
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0xdceaff, size: 0.035, transparent: true, opacity: 0.8 })));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  scene.add(
+    new THREE.Points(
+      geometry,
+      new THREE.PointsMaterial({ size: 0.035, transparent: true, opacity: 0.86, vertexColors: true })
+    )
+  );
+}
+
+function createSun() {
+  const sunSprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: createRadialTexture("#fff5cc", "#ffb84d"),
+      color: 0xffffff,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  );
+  sunSprite.position.set(-7.2, 5.2, 7.4);
+  sunSprite.scale.set(2.7, 2.7, 1);
+  scene.add(sunSprite);
 }
 
 function createPlanets() {
-  const earth = new THREE.Mesh(new THREE.SphereGeometry(0.95, 72, 72), new THREE.MeshStandardMaterial({ map: createEarthTexture(), roughness: 0.62, metalness: 0.04 }));
+  const earth = new THREE.Mesh(
+    new THREE.SphereGeometry(0.95, 96, 96),
+    new THREE.MeshStandardMaterial({ map: createEarthTexture(), roughness: 0.58, metalness: 0.03 })
+  );
   earth.position.copy(EARTH);
   scene.add(earth);
 
-  const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(1.04, 72, 72), new THREE.MeshBasicMaterial({ color: 0x68b7ff, transparent: true, opacity: 0.14, side: THREE.BackSide }));
+  const cloudShell = new THREE.Mesh(
+    new THREE.SphereGeometry(0.973, 96, 96),
+    new THREE.MeshStandardMaterial({ map: createCloudTexture(), transparent: true, opacity: 0.18, roughness: 0.9, depthWrite: false })
+  );
+  cloudShell.position.copy(EARTH);
+  scene.add(cloudShell);
+
+  const atmosphere = new THREE.Mesh(
+    new THREE.SphereGeometry(1.08, 96, 96),
+    new THREE.MeshBasicMaterial({ color: 0x68b7ff, transparent: true, opacity: 0.18, side: THREE.BackSide, blending: THREE.AdditiveBlending })
+  );
   atmosphere.position.copy(EARTH);
   scene.add(atmosphere);
+
+  const earthGlow = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: createRadialTexture("#74caff", "#1b79d8"), transparent: true, opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  earthGlow.position.copy(EARTH);
+  earthGlow.scale.set(2.65, 2.65, 1);
+  scene.add(earthGlow);
 
   const moonTexture = createMoonTexture();
   const moon = new THREE.Mesh(new THREE.SphereGeometry(0.52, 64, 64), new THREE.MeshStandardMaterial({ map: moonTexture, bumpMap: moonTexture, bumpScale: 0.045, roughness: 0.94 }));
@@ -206,6 +270,7 @@ function createPlanets() {
   scene.add(moon);
 
   scene.userData.earth = earth;
+  scene.userData.cloudShell = cloudShell;
   scene.userData.atmosphere = atmosphere;
   scene.userData.moon = moon;
 }
@@ -216,30 +281,58 @@ function createReferenceRings() {
   addRing(MOON, 0.78, new THREE.Vector3(0.18, 1, 0.2), 0x8ed6d1, 0.2);
 }
 
+function createDepthCues() {
+  const grid = new THREE.Group();
+  const material = new THREE.LineBasicMaterial({ color: 0x31526d, transparent: true, opacity: 0.16 });
+  for (let x = -5; x <= 6; x += 1) {
+    grid.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, -1.85, -2.35), new THREE.Vector3(x, -1.85, 2.35)]), material));
+  }
+  for (let z = -2; z <= 2; z += 1) {
+    grid.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-5.4, -1.85, z), new THREE.Vector3(6.35, -1.85, z)]), material));
+  }
+  scene.add(grid);
+
+  const dropMaterial = new THREE.LineBasicMaterial({ color: 0xf6c453, transparent: true, opacity: 0.16 });
+  milestones.slice(1, -1).forEach((item) => {
+    const point = pointAt(item.t / DURATION);
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([point, new THREE.Vector3(point.x, -1.85, point.z)]), dropMaterial));
+  });
+}
+
 function createTrajectory() {
-  scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 900, 0.012, 8, false), new THREE.MeshBasicMaterial({ color: 0x5fd8d4, transparent: true, opacity: 0.58 })));
+  scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 900, 0.013, 10, false), new THREE.MeshBasicMaterial({ color: 0x5fd8d4, transparent: true, opacity: 0.5 })));
+  scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 900, 0.004, 8, false), new THREE.MeshBasicMaterial({ color: 0xdfffff, transparent: true, opacity: 0.86 })));
+  addDirectionChevrons();
 }
 
 function createMarkers() {
   const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xf6c453 });
   const flybyMaterial = new THREE.MeshBasicMaterial({ color: 0xff805d });
+  const markerGlowTexture = createRadialTexture("#fff0b3", "#f6c453");
   milestones.forEach((item) => {
-    const marker = new THREE.Mesh(new THREE.SphereGeometry(0.07, 18, 18), item.id === "flyby" ? flybyMaterial : markerMaterial);
+    const marker = new THREE.Group();
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.07, 18, 18), item.id === "flyby" ? flybyMaterial : markerMaterial);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: markerGlowTexture, transparent: true, opacity: item.id === "flyby" ? 0.62 : 0.46, blending: THREE.AdditiveBlending, depthWrite: false }));
+    glow.scale.set(0.42, 0.42, 1);
+    marker.add(glow, dot);
     marker.position.copy(pointAt(item.t / DURATION));
-    markerRefs.push({ id: item.id, mesh: marker });
+    markerRefs.push({ id: item.id, mesh: marker, glow });
     scene.add(marker);
   });
 }
 
 function createOrion() {
   const root = new THREE.Group();
-  root.scale.setScalar(0.72);
+  root.scale.setScalar(0.82);
   const capsuleMat = new THREE.MeshPhysicalMaterial({ color: 0xeef4fb, metalness: 0.32, roughness: 0.22, clearcoat: 0.4 });
   const heatMat = new THREE.MeshStandardMaterial({ color: 0x8f5738, roughness: 0.55, metalness: 0.18 });
   const serviceMat = new THREE.MeshStandardMaterial({ color: 0xaeb9c6, roughness: 0.28, metalness: 0.55 });
   const panelMat = new THREE.MeshStandardMaterial({ color: 0x244fba, emissive: 0x0c2d72, emissiveIntensity: 0.35 });
   const frameMat = new THREE.MeshStandardMaterial({ color: 0xd8e2ec, metalness: 0.42, roughness: 0.28 });
   const darkMat = new THREE.MeshStandardMaterial({ color: 0x242a33, metalness: 0.8, roughness: 0.24 });
+  const windowMat = new THREE.MeshStandardMaterial({ color: 0x111827, emissive: 0x3e9fff, emissiveIntensity: 0.12, roughness: 0.18 });
+  const plumeMat = new THREE.MeshBasicMaterial({ color: 0x73d9ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const plasmaMat = new THREE.MeshBasicMaterial({ color: 0xff8a3d, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
 
   const capsule = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.38, 48), capsuleMat);
   capsule.rotation.x = Math.PI / 2;
@@ -256,6 +349,10 @@ function createOrion() {
   service.position.z = -0.34;
   root.add(service);
 
+  const serviceBand = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.011, 10, 52), frameMat);
+  serviceBand.position.z = -0.18;
+  root.add(serviceBand);
+
   const engine = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.18, 32), darkMat);
   engine.rotation.x = -Math.PI / 2;
   engine.position.z = -0.62;
@@ -265,21 +362,56 @@ function createOrion() {
   docking.position.z = 0.39;
   root.add(docking);
 
+  [-0.07, 0.07].forEach((x) => {
+    const window = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.012, 0.035), windowMat);
+    window.position.set(x, 0.175, 0.12);
+    window.rotation.x = 0.48;
+    root.add(window);
+  });
+
+  [-1, 1].forEach((side) => {
+    const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.3, 10), frameMat);
+    antenna.rotation.z = side * 0.58;
+    antenna.position.set(side * 0.18, 0.02, -0.1);
+    root.add(antenna);
+
+    const thruster = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.05, 16), darkMat);
+    thruster.rotation.x = Math.PI / 2;
+    thruster.position.set(side * 0.16, -0.08, -0.52);
+    root.add(thruster);
+  });
+
   addPanel(root, -0.54, 0, -0.34, 0, panelMat, frameMat);
   addPanel(root, 0.54, 0, -0.34, 0, panelMat, frameMat);
   addPanel(root, 0, 0.54, -0.34, Math.PI / 2, panelMat, frameMat);
   addPanel(root, 0, -0.54, -0.34, Math.PI / 2, panelMat, frameMat);
 
+  const plume = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.72, 36, 1, true), plumeMat);
+  plume.rotation.x = -Math.PI / 2;
+  plume.position.z = -0.92;
+  root.add(plume);
+
+  const plasma = new THREE.Mesh(new THREE.SphereGeometry(0.27, 32, 18), plasmaMat);
+  plasma.scale.set(1, 0.82, 1.45);
+  plasma.position.z = 0.12;
+  root.add(plasma);
+
   const glow = new THREE.PointLight(0x6bd8ff, 1.0, 1.6);
   glow.position.set(0, 0, -0.7);
   root.add(glow);
+  root.userData = { plume, plumeMat, plasma, plasmaMat, engineGlow: glow };
   return root;
 }
 
 function addPanel(root, x, y, z, rotationZ, panelMat, frameMat) {
   const group = new THREE.Group();
-  group.add(new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.035, 0.22), frameMat));
-  group.add(new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.042, 0.17), panelMat));
+  group.add(new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.035, 0.25), frameMat));
+  group.add(new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.042, 0.19), panelMat));
+  for (let i = -2; i <= 2; i += 1) {
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.046, 0.21), frameMat);
+    rib.position.x = i * 0.14;
+    group.add(rib);
+  }
   group.position.set(x, y, z);
   group.rotation.z = rotationZ;
   root.add(group);
@@ -301,6 +433,16 @@ function updateScene() {
   orion.position.copy(point);
   orion.quaternion.slerp(targetQuaternion, 0.24);
 
+  const burn = enginePulse(state.time);
+  orion.userData.plume.visible = burn > 0.02;
+  orion.userData.plumeMat.opacity = 0.1 + burn * 0.56;
+  orion.userData.plume.scale.set(0.72 + burn * 0.65, 0.72 + burn * 0.65, 0.86 + burn * 1.1);
+  orion.userData.engineGlow.intensity = 0.75 + burn * 2.3;
+  const entry = enginePulse(state.time, [90], 5.4);
+  orion.userData.plasma.visible = entry > 0.02;
+  orion.userData.plasmaMat.opacity = entry * 0.34;
+  orion.userData.plasma.scale.set(1 + entry * 0.4, 0.82 + entry * 0.2, 1.45 + entry * 0.52);
+
   if (trail) {
     trail.geometry.dispose();
     scene.remove(trail);
@@ -312,7 +454,11 @@ function updateScene() {
   scene.add(trail);
 
   const active = milestones[activeIndex()];
-  markerRefs.forEach((marker) => marker.mesh.scale.setScalar(marker.id === active.id ? 1.7 : 1));
+  markerRefs.forEach((marker) => {
+    const activeScale = marker.id === active.id ? 1.75 : 1;
+    marker.mesh.scale.setScalar(activeScale);
+    marker.glow.material.opacity = marker.id === active.id ? 0.78 : 0.38;
+  });
   if (active.id !== lastActiveId) {
     lastActiveId = active.id;
     if (activeLabel) scene.remove(activeLabel);
@@ -322,8 +468,56 @@ function updateScene() {
   }
 
   scene.userData.earth.rotation.y += 0.0022;
+  scene.userData.cloudShell.rotation.y += 0.003;
   scene.userData.atmosphere.rotation.y += 0.0013;
   scene.userData.moon.rotation.y += 0.001;
+  updateCamera(progress, point, tangent);
+}
+
+function updateCamera(progress, point, tangent) {
+  if (state.view === "manual") return;
+
+  let target = new THREE.Vector3(0.2, -0.08, 0.15);
+  let position = new THREE.Vector3(-1.1, 5.35, 10.6);
+  const safeSide = Math.abs(tangent.y) > 0.92 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize();
+
+  if (state.view === "follow") {
+    target = point.clone().add(tangent.clone().multiplyScalar(0.38));
+    position = point.clone().add(tangent.clone().multiplyScalar(-2.45)).add(safeSide.multiplyScalar(1.4)).add(new THREE.Vector3(0, 1.18, 0.45));
+  } else if (state.view === "earth") {
+    target = EARTH.clone().lerp(point, 0.2);
+    position = EARTH.clone().add(new THREE.Vector3(-0.75, 2.15, 4.35));
+  } else if (state.view === "moon") {
+    target = MOON.clone().lerp(point, 0.25);
+    position = MOON.clone().add(new THREE.Vector3(1.7, 1.65, 3.25));
+  } else {
+    const lunarWeight = smoothstep(0.44, 0.66, progress) * (1 - smoothstep(0.74, 0.92, progress));
+    const earthReturn = smoothstep(0.76, 1, progress);
+    const anchor = EARTH.clone().lerp(MOON, lunarWeight).lerp(EARTH, earthReturn * 0.72);
+    target = anchor.lerp(point, 0.34 + Math.sin(progress * Math.PI) * 0.18);
+    const orbitAngle = progress * Math.PI * 1.58 + 0.8;
+    const distance = 5.9 + smoothstep(0.24, 0.62, progress) * 1.7 - smoothstep(0.82, 1, progress) * 0.8;
+    position = target.clone().add(new THREE.Vector3(Math.cos(orbitAngle) * distance, 2.55 + Math.sin(progress * Math.PI * 2) * 0.52, Math.sin(orbitAngle) * distance));
+  }
+
+  camera.position.lerp(position, 0.034);
+  orbit.target.lerp(target, 0.055);
+}
+
+function enginePulse(time, centers = [0, 24, 42, 73], width = 3.2) {
+  return centers.reduce((peak, center) => Math.max(peak, Math.exp(-((time - center) ** 2) / (width * width))), 0);
+}
+
+function addDirectionChevrons() {
+  const material = new THREE.MeshBasicMaterial({ color: 0xf6c453, transparent: true, opacity: 0.8 });
+  [0.18, 0.34, 0.5, 0.68, 0.84].forEach((t) => {
+    const point = pointAt(t);
+    const tangent = pointAt(Math.min(1, t + 0.01)).sub(pointAt(Math.max(0, t - 0.01))).normalize();
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.22, 18), material);
+    cone.position.copy(point);
+    cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
+    scene.add(cone);
+  });
 }
 
 function addRing(center, radius, normal, color, opacity) {
@@ -357,13 +551,29 @@ function createEarthTexture() {
       ctx.fill();
       ctx.restore();
     });
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.36)";
-    ctx.lineWidth = 9;
-    for (let i = 0; i < 32; i += 1) {
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 18; i += 1) {
       ctx.beginPath();
-      ctx.ellipse((i * 137) % width, (i * 73) % height, 78 + (i % 4) * 24, 12 + (i % 3) * 8, (i % 7) * 0.4, 0, Math.PI * 2);
+      ctx.ellipse((i * 137) % width, (i * 73) % height, 72 + (i % 4) * 20, 10 + (i % 3) * 6, (i % 7) * 0.4, 0, Math.PI * 2);
       ctx.stroke();
     }
+  });
+}
+
+function createCloudTexture() {
+  return makeCanvasTexture(1024, 512, (ctx, width, height) => {
+    ctx.clearRect(0, 0, width, height);
+    ctx.filter = "blur(7px)";
+    for (let i = 0; i < 42; i += 1) {
+      const x = (i * 151) % width;
+      const y = (i * 83) % height;
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.14 + (i % 4) * 0.025})`;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 70 + (i % 5) * 18, 9 + (i % 3) * 5, (i % 9) * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.filter = "none";
   });
 }
 
@@ -385,6 +595,25 @@ function createMoonTexture() {
       ctx.fill();
     }
   });
+}
+
+function createRadialTexture(inner, outer) {
+  return makeCanvasTexture(256, 256, (ctx, width, height) => {
+    const gradient = ctx.createRadialGradient(width / 2, height / 2, 4, width / 2, height / 2, width / 2);
+    gradient.addColorStop(0, inner);
+    gradient.addColorStop(0.24, inner);
+    gradient.addColorStop(1, transparentHex(outer));
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+  });
+}
+
+function transparentHex(hex) {
+  const value = hex.replace("#", "");
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, 0)`;
 }
 
 function makeCanvasTexture(width, height, painter) {
@@ -422,6 +651,7 @@ function resize() {
   const width = mount.clientWidth;
   const height = mount.clientHeight;
   renderer.setSize(width, height, false);
+  if (composer) composer.setSize(width, height);
   camera.aspect = width / Math.max(1, height);
   camera.updateProjectionMatrix();
   if (camera.aspect < 1.2 && camera.position.length() < 13) camera.position.set(0, 5.7, 14.4);
@@ -458,8 +688,14 @@ function updateDom() {
   dom.scrubber.value = String(state.time);
   dom.playButton.textContent = state.playing ? "Pause" : "Play";
   dom.playButton.setAttribute("aria-label", state.playing ? "Pause" : "Play");
+  dom.viewSelect.value = state.view;
   dom.dialog.hidden = !state.dialogOpen;
   document.querySelectorAll("[data-milestone]").forEach((button) => button.classList.toggle("active", button.dataset.milestone === active.id));
+}
+
+function smoothstep(edge0, edge1, value) {
+  const x = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return x * x * (3 - 2 * x);
 }
 
 function clamp(value, min, max) {
