@@ -1,11 +1,16 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import orionAtlasUrl from "./assets/orion-texture-atlas.png";
 import "./styles.css";
 
 const DURATION = 100;
+const ORION_ATLAS_SIZE = 1254;
+const EARTH_TEXTURE_URL = "/assets/earth-blue-marble-april.jpg";
+const MOON_MODEL_URL = "/assets/moon_nasa_lro_small.glb";
 const EARTH = new THREE.Vector3(-3.55, -0.1, 0);
 const MOON = new THREE.Vector3(4.75, 0.18, -1.1);
 
@@ -36,6 +41,9 @@ document.querySelector("#root").innerHTML = `
       <div class="stageFrame">
         <div id="game" aria-label="Three.js 3D Artemis II trajectory scene"></div>
         <div class="sceneCaption"><strong id="captionTitle"></strong><span id="captionShort"></span></div>
+        <button class="fullscreenButton" type="button" id="fullscreenButton" aria-label="Enter fullscreen" title="Fullscreen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5h2V5h3V3Zm8 0v2h3v3h2V3h-5ZM5 16H3v5h5v-2H5v-3Zm14 3h-3v2h5v-5h-2v3Z" /></svg>
+        </button>
       </div>
       <div class="controls" aria-label="Playback controls">
         <button class="iconButton" type="button" id="playButton" aria-label="Pause">Pause</button>
@@ -61,7 +69,7 @@ document.querySelector("#root").innerHTML = `
 `;
 
 const dom = Object.fromEntries(
-  ["activeDay", "activeLabel", "captionTitle", "captionShort", "dialogTitle", "dialogText", "dialog", "dialogToggle", "scrubber", "playButton", "restartButton", "prevButton", "nextButton", "speedSelect", "viewSelect", "timelineMarkers", "missionList"].map((id) => [id, document.querySelector(`#${id}`)])
+  ["activeDay", "activeLabel", "captionTitle", "captionShort", "dialogTitle", "dialogText", "dialog", "dialogToggle", "scrubber", "playButton", "restartButton", "prevButton", "nextButton", "speedSelect", "viewSelect", "fullscreenButton", "timelineMarkers", "missionList"].map((id) => [id, document.querySelector(`#${id}`)])
 );
 
 const state = {
@@ -132,8 +140,18 @@ dom.dialogToggle.addEventListener("click", () => {
   state.dialogOpen = !state.dialogOpen;
   updateDom();
 });
+dom.fullscreenButton.addEventListener("click", toggleFullscreen);
+document.addEventListener("fullscreenchange", () => {
+  updateFullscreenButton();
+  requestAnimationFrame(resize);
+});
+document.addEventListener("webkitfullscreenchange", () => {
+  updateFullscreenButton();
+  requestAnimationFrame(resize);
+});
 
 const mount = document.querySelector("#game");
+const stageFrame = document.querySelector(".stageFrame");
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x050814);
 scene.fog = new THREE.Fog(0x050814, 11, 28);
@@ -236,11 +254,16 @@ function createSun() {
 }
 
 function createPlanets() {
+  const textureLoader = new THREE.TextureLoader();
+  const earthMap = textureLoader.load(EARTH_TEXTURE_URL);
+  earthMap.colorSpace = THREE.SRGBColorSpace;
+  earthMap.anisotropy = 8;
   const earth = new THREE.Mesh(
     new THREE.SphereGeometry(0.95, 96, 96),
-    new THREE.MeshStandardMaterial({ map: createEarthTexture(), roughness: 0.58, metalness: 0.03 })
+    new THREE.MeshStandardMaterial({ map: earthMap, emissiveMap: earthMap, emissive: 0x17304a, emissiveIntensity: 0.18, roughness: 0.62, metalness: 0.02 })
   );
   earth.position.copy(EARTH);
+  earth.rotation.y = -0.72;
   scene.add(earth);
 
   const cloudShell = new THREE.Mesh(
@@ -264,15 +287,65 @@ function createPlanets() {
   earthGlow.scale.set(2.65, 2.65, 1);
   scene.add(earthGlow);
 
-  const moonTexture = createMoonTexture();
-  const moon = new THREE.Mesh(new THREE.SphereGeometry(0.52, 64, 64), new THREE.MeshStandardMaterial({ map: moonTexture, bumpMap: moonTexture, bumpScale: 0.045, roughness: 0.94 }));
-  moon.position.copy(MOON);
+  const moon = createMoonFallback();
   scene.add(moon);
+  loadNasaMoonModel(moon);
 
   scene.userData.earth = earth;
   scene.userData.cloudShell = cloudShell;
   scene.userData.atmosphere = atmosphere;
   scene.userData.moon = moon;
+}
+
+function createMoonFallback() {
+  const moonTexture = createMoonTexture();
+  const moon = new THREE.Group();
+  const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.52, 96, 96), new THREE.MeshStandardMaterial({ map: moonTexture, bumpMap: moonTexture, bumpScale: 0.045, roughness: 0.94 }));
+  moon.add(sphere);
+  moon.position.copy(MOON);
+  moon.userData.fallback = sphere;
+  return moon;
+}
+
+function loadNasaMoonModel(moon) {
+  new GLTFLoader().load(
+    MOON_MODEL_URL,
+    (gltf) => {
+      const model = gltf.scene;
+      normalizeModelToRadius(model, 0.52);
+      model.traverse((child) => {
+        if (!child.isMesh) return;
+        child.castShadow = false;
+        child.receiveShadow = false;
+        if (child.material) {
+          child.material.roughness = 0.98;
+          child.material.metalness = 0;
+        }
+      });
+      if (moon.userData.fallback) {
+        moon.remove(moon.userData.fallback);
+        moon.userData.fallback.geometry.dispose();
+        moon.userData.fallback.material.dispose();
+      }
+      moon.add(model);
+      moon.userData.source = "NASA SVS LRO moon_small.glb";
+    },
+    undefined,
+    () => {
+      moon.userData.source = "procedural fallback";
+    }
+  );
+}
+
+function normalizeModelToRadius(model, radius) {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  const maxAxis = Math.max(size.x, size.y, size.z);
+  model.position.sub(center);
+  model.scale.setScalar((radius * 2) / maxAxis);
 }
 
 function createReferenceRings() {
@@ -311,9 +384,9 @@ function createMarkers() {
   const markerGlowTexture = createRadialTexture("#fff0b3", "#f6c453");
   milestones.forEach((item) => {
     const marker = new THREE.Group();
-    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.07, 18, 18), item.id === "flyby" ? flybyMaterial : markerMaterial);
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.045, 18, 18), item.id === "flyby" ? flybyMaterial : markerMaterial);
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: markerGlowTexture, transparent: true, opacity: item.id === "flyby" ? 0.62 : 0.46, blending: THREE.AdditiveBlending, depthWrite: false }));
-    glow.scale.set(0.42, 0.42, 1);
+    glow.scale.set(0.26, 0.26, 1);
     marker.add(glow, dot);
     marker.position.copy(pointAt(item.t / DURATION));
     markerRefs.push({ id: item.id, mesh: marker, glow });
@@ -323,72 +396,92 @@ function createMarkers() {
 
 function createOrion() {
   const root = new THREE.Group();
-  root.scale.setScalar(0.82);
-  const capsuleMat = new THREE.MeshPhysicalMaterial({ color: 0xeef4fb, metalness: 0.32, roughness: 0.22, clearcoat: 0.4 });
-  const heatMat = new THREE.MeshStandardMaterial({ color: 0x8f5738, roughness: 0.55, metalness: 0.18 });
-  const serviceMat = new THREE.MeshStandardMaterial({ color: 0xaeb9c6, roughness: 0.28, metalness: 0.55 });
-  const panelMat = new THREE.MeshStandardMaterial({ color: 0x244fba, emissive: 0x0c2d72, emissiveIntensity: 0.35 });
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0xd8e2ec, metalness: 0.42, roughness: 0.28 });
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x242a33, metalness: 0.8, roughness: 0.24 });
-  const windowMat = new THREE.MeshStandardMaterial({ color: 0x111827, emissive: 0x3e9fff, emissiveIntensity: 0.12, roughness: 0.18 });
+  root.scale.setScalar(0.56);
+  const {
+    capsuleMat,
+    heatMat,
+    serviceMat,
+    panelMat,
+    frameMat,
+    darkMat,
+    windowMat,
+    goldMat,
+    whiteMat,
+  } = createOrionMaterials();
   const plumeMat = new THREE.MeshBasicMaterial({ color: 0x73d9ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
   const plasmaMat = new THREE.MeshBasicMaterial({ color: 0xff8a3d, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
 
-  const capsule = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.38, 48), capsuleMat);
+  const capsule = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.28, 0.42, 72, 1, false), capsuleMat);
   capsule.rotation.x = Math.PI / 2;
-  capsule.position.z = 0.17;
+  capsule.position.z = 0.16;
   root.add(capsule);
 
-  const heat = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.045, 48), heatMat);
+  const heat = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.056, 72), heatMat);
   heat.rotation.x = Math.PI / 2;
-  heat.position.z = -0.05;
+  heat.position.z = -0.08;
   root.add(heat);
 
-  const service = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.38, 48), serviceMat);
+  const adapter = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.21, 0.1, 64), whiteMat);
+  adapter.rotation.x = Math.PI / 2;
+  adapter.position.z = -0.17;
+  root.add(adapter);
+
+  const service = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.48, 72), serviceMat);
   service.rotation.x = Math.PI / 2;
-  service.position.z = -0.34;
+  service.position.z = -0.46;
   root.add(service);
 
-  const serviceBand = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.011, 10, 52), frameMat);
-  serviceBand.position.z = -0.18;
+  const serviceBand = new THREE.Mesh(new THREE.TorusGeometry(0.225, 0.011, 10, 64), frameMat);
+  serviceBand.position.z = -0.23;
   root.add(serviceBand);
 
-  const engine = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.18, 32), darkMat);
+  const aftBand = new THREE.Mesh(new THREE.TorusGeometry(0.225, 0.012, 10, 64), frameMat);
+  aftBand.position.z = -0.7;
+  root.add(aftBand);
+
+  const engine = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.24, 40, 1, true), darkMat);
   engine.rotation.x = -Math.PI / 2;
-  engine.position.z = -0.62;
+  engine.position.z = -0.82;
   root.add(engine);
 
-  const docking = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.012, 12, 48), frameMat);
-  docking.position.z = 0.39;
+  const engineLip = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.011, 10, 48), goldMat);
+  engineLip.position.z = -0.93;
+  root.add(engineLip);
+
+  const docking = new THREE.Mesh(new THREE.TorusGeometry(0.092, 0.012, 12, 56), frameMat);
+  docking.position.z = 0.43;
   root.add(docking);
 
-  [-0.07, 0.07].forEach((x) => {
-    const window = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.012, 0.035), windowMat);
-    window.position.set(x, 0.175, 0.12);
-    window.rotation.x = 0.48;
+  [-0.085, 0.085].forEach((x) => {
+    const window = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.016, 0.045), windowMat);
+    window.position.set(x, 0.235, 0.14);
+    window.rotation.x = 0.55;
     root.add(window);
   });
 
+  [0, Math.PI / 2, Math.PI, Math.PI * 1.5].forEach((angle) => {
+    addServiceDetail(root, angle, darkMat, goldMat, frameMat);
+  });
+
   [-1, 1].forEach((side) => {
-    const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.3, 10), frameMat);
+    const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.34, 10), frameMat);
     antenna.rotation.z = side * 0.58;
-    antenna.position.set(side * 0.18, 0.02, -0.1);
+    antenna.position.set(side * 0.24, 0.02, -0.08);
     root.add(antenna);
 
     const thruster = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.05, 16), darkMat);
     thruster.rotation.x = Math.PI / 2;
-    thruster.position.set(side * 0.16, -0.08, -0.52);
+    thruster.position.set(side * 0.22, -0.1, -0.62);
     root.add(thruster);
   });
 
-  addPanel(root, -0.54, 0, -0.34, 0, panelMat, frameMat);
-  addPanel(root, 0.54, 0, -0.34, 0, panelMat, frameMat);
-  addPanel(root, 0, 0.54, -0.34, Math.PI / 2, panelMat, frameMat);
-  addPanel(root, 0, -0.54, -0.34, Math.PI / 2, panelMat, frameMat);
+  [0, Math.PI / 2, Math.PI, Math.PI * 1.5].forEach((angle) => {
+    addSolarWing(root, angle, panelMat, frameMat, goldMat);
+  });
 
   const plume = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.72, 36, 1, true), plumeMat);
   plume.rotation.x = -Math.PI / 2;
-  plume.position.z = -0.92;
+  plume.position.z = -1.08;
   root.add(plume);
 
   const plasma = new THREE.Mesh(new THREE.SphereGeometry(0.27, 32, 18), plasmaMat);
@@ -403,17 +496,79 @@ function createOrion() {
   return root;
 }
 
-function addPanel(root, x, y, z, rotationZ, panelMat, frameMat) {
+function createOrionMaterials() {
+  return {
+    capsuleMat: new THREE.MeshPhysicalMaterial({ map: atlasTexture(0, 0, 610, 610), color: 0xf5f6f2, metalness: 0.22, roughness: 0.46, clearcoat: 0.22 }),
+    heatMat: new THREE.MeshStandardMaterial({ map: atlasTexture(627, 0, 627, 610), color: 0xb28460, roughness: 0.72, metalness: 0.08 }),
+    serviceMat: new THREE.MeshStandardMaterial({ map: atlasTexture(627, 610, 627, 644), color: 0xbec3c5, roughness: 0.36, metalness: 0.62 }),
+    panelMat: new THREE.MeshStandardMaterial({ map: atlasTexture(0, 815, 610, 390), color: 0x224fa7, emissive: 0x071f55, emissiveIntensity: 0.18, roughness: 0.2, metalness: 0.18 }),
+    frameMat: new THREE.MeshStandardMaterial({ map: atlasTexture(627, 610, 627, 644), color: 0xd8e0e5, metalness: 0.58, roughness: 0.28 }),
+    darkMat: new THREE.MeshStandardMaterial({ map: atlasTexture(0, 610, 610, 205), color: 0x25282b, metalness: 0.82, roughness: 0.22 }),
+    windowMat: new THREE.MeshPhysicalMaterial({ map: atlasTexture(0, 610, 610, 205), color: 0x05070b, emissive: 0x174c8a, emissiveIntensity: 0.1, roughness: 0.08, clearcoat: 0.85 }),
+    goldMat: new THREE.MeshStandardMaterial({ color: 0xc39846, metalness: 0.82, roughness: 0.28 }),
+    whiteMat: new THREE.MeshStandardMaterial({ map: atlasTexture(0, 0, 610, 610), color: 0xf3f4ee, roughness: 0.52, metalness: 0.2 }),
+  };
+}
+
+function atlasTexture(x, y, width, height) {
+  const texture = new THREE.TextureLoader().load(orionAtlasUrl);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.repeat.set(width / ORION_ATLAS_SIZE, height / ORION_ATLAS_SIZE);
+  texture.offset.set(x / ORION_ATLAS_SIZE, 1 - (y + height) / ORION_ATLAS_SIZE);
+  return texture;
+}
+
+function addServiceDetail(root, angle, darkMat, goldMat, frameMat) {
+  const radial = new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0);
+  const tangentAngle = angle + Math.PI / 2;
+  const radiator = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.012, 0.25), darkMat);
+  radiator.position.copy(radial.clone().multiplyScalar(0.225)).add(new THREE.Vector3(0, 0, -0.47));
+  radiator.rotation.z = tangentAngle;
+  root.add(radiator);
+
+  [-0.08, 0.08].forEach((offset) => {
+    const thruster = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.026, 0.06, 16), goldMat);
+    thruster.position.copy(radial.clone().multiplyScalar(0.24)).add(new THREE.Vector3(0, 0, -0.5 + offset));
+    thruster.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
+    root.add(thruster);
+  });
+
+  const latch = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.018, 0.04), frameMat);
+  latch.position.copy(radial.clone().multiplyScalar(0.235)).add(new THREE.Vector3(0, 0, -0.25));
+  latch.rotation.z = tangentAngle;
+  root.add(latch);
+}
+
+function addSolarWing(root, angle, panelMat, frameMat, goldMat) {
   const group = new THREE.Group();
-  group.add(new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.035, 0.25), frameMat));
-  group.add(new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.042, 0.19), panelMat));
-  for (let i = -2; i <= 2; i += 1) {
-    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.046, 0.21), frameMat);
-    rib.position.x = i * 0.14;
+  const radial = new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0);
+  const hinge = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.1, 0.11), goldMat);
+  hinge.position.copy(radial.clone().multiplyScalar(0.28)).add(new THREE.Vector3(0, 0, -0.42));
+  hinge.rotation.z = angle;
+  group.add(hinge);
+
+  const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.42, 10), frameMat);
+  boom.position.copy(radial.clone().multiplyScalar(0.48)).add(new THREE.Vector3(0, 0, -0.42));
+  boom.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), radial);
+  group.add(boom);
+
+  for (let segment = 0; segment < 2; segment += 1) {
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.03, 0.25), panelMat);
+    panel.position.copy(radial.clone().multiplyScalar(0.72 + segment * 0.5)).add(new THREE.Vector3(0, 0, -0.42));
+    panel.rotation.z = angle;
+    group.add(panel);
+  }
+
+  for (let i = 0; i <= 4; i += 1) {
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.038, 0.28), frameMat);
+    rib.position.copy(radial.clone().multiplyScalar(0.47 + i * 0.24)).add(new THREE.Vector3(0, 0, -0.42));
+    rib.rotation.z = angle;
     group.add(rib);
   }
-  group.position.set(x, y, z);
-  group.rotation.z = rotationZ;
+
   root.add(group);
 }
 
@@ -455,7 +610,7 @@ function updateScene() {
 
   const active = milestones[activeIndex()];
   markerRefs.forEach((marker) => {
-    const activeScale = marker.id === active.id ? 1.75 : 1;
+    const activeScale = marker.id === active.id ? 1.45 : 1;
     marker.mesh.scale.setScalar(activeScale);
     marker.glow.material.opacity = marker.id === active.id ? 0.78 : 0.38;
   });
@@ -509,11 +664,11 @@ function enginePulse(time, centers = [0, 24, 42, 73], width = 3.2) {
 }
 
 function addDirectionChevrons() {
-  const material = new THREE.MeshBasicMaterial({ color: 0xf6c453, transparent: true, opacity: 0.8 });
+  const material = new THREE.MeshBasicMaterial({ color: 0xf6c453, transparent: true, opacity: 0.72 });
   [0.18, 0.34, 0.5, 0.68, 0.84].forEach((t) => {
     const point = pointAt(t);
     const tangent = pointAt(Math.min(1, t + 0.01)).sub(pointAt(Math.max(0, t - 0.01))).normalize();
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.22, 18), material);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.15, 18), material);
     cone.position.copy(point);
     cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
     scene.add(cone);
@@ -531,34 +686,6 @@ function addRing(center, radius, normal, color, opacity) {
     points.push(center.clone().add(u.clone().multiplyScalar(Math.cos(angle) * radius)).add(v.clone().multiplyScalar(Math.sin(angle) * radius)));
   }
   scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color, transparent: true, opacity })));
-}
-
-function createEarthTexture() {
-  return makeCanvasTexture(1024, 512, (ctx, width, height) => {
-    const ocean = ctx.createLinearGradient(0, 0, width, height);
-    ocean.addColorStop(0, "#123f86");
-    ocean.addColorStop(0.45, "#277bc7");
-    ocean.addColorStop(1, "#0a2d66");
-    ctx.fillStyle = ocean;
-    ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = "rgba(76, 164, 116, 0.84)";
-    [[150, 205, 210, 88, -0.12], [360, 132, 160, 70, 0.22], [520, 280, 230, 94, -0.34], [740, 170, 170, 82, 0.32], [860, 320, 132, 62, -0.24]].forEach(([x, y, w, h, r]) => {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(r);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    });
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-    ctx.lineWidth = 3;
-    for (let i = 0; i < 18; i += 1) {
-      ctx.beginPath();
-      ctx.ellipse((i * 137) % width, (i * 73) % height, 72 + (i % 4) * 20, 10 + (i % 3) * 6, (i % 7) * 0.4, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  });
 }
 
 function createCloudTexture() {
@@ -655,6 +782,32 @@ function resize() {
   camera.aspect = width / Math.max(1, height);
   camera.updateProjectionMatrix();
   if (camera.aspect < 1.2 && camera.position.length() < 13) camera.position.set(0, 5.7, 14.4);
+}
+
+async function toggleFullscreen() {
+  try {
+    if (!fullscreenElement()) {
+      await (stageFrame.requestFullscreen?.() || stageFrame.webkitRequestFullscreen?.());
+    } else {
+      await (document.exitFullscreen?.() || document.webkitExitFullscreen?.());
+    }
+  } catch {
+    updateFullscreenButton();
+  }
+}
+
+function updateFullscreenButton() {
+  const fullscreen = fullscreenElement() === stageFrame;
+  dom.fullscreenButton.classList.toggle("active", fullscreen);
+  dom.fullscreenButton.setAttribute("aria-label", fullscreen ? "Exit fullscreen" : "Enter fullscreen");
+  dom.fullscreenButton.title = fullscreen ? "Exit fullscreen" : "Fullscreen";
+  dom.fullscreenButton.innerHTML = fullscreen
+    ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H7v4H3v2h6V3Zm8 0h-2v6h6V7h-4V3ZM3 17h4v4h2v-6H3v2Zm12 4h2v-4h4v-2h-6v6Z" /></svg>`
+    : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5h2V5h3V3Zm8 0v2h3v3h2V3h-5ZM5 16H3v5h5v-2H5v-3Zm14 3h-3v2h5v-5h-2v3Z" /></svg>`;
+}
+
+function fullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement;
 }
 
 function pointAt(progress) {

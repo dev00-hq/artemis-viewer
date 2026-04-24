@@ -126,11 +126,23 @@ h3 {
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.4);
 }
 
+.stageFrame:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border: 0;
+  border-radius: 0;
+  background: #02050d;
+}
+
 .stageFrame::before {
   content: "";
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
+}
+
+.stageFrame:fullscreen::before {
+  display: none;
 }
 
 #game {
@@ -157,6 +169,39 @@ h3 {
   padding: 10px 13px;
   background: rgba(5, 8, 20, 0.74);
   backdrop-filter: blur(14px);
+}
+
+.fullscreenButton {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 3;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(238, 245, 255, 0.22);
+  border-radius: 8px;
+  color: #eef5ff;
+  background: rgba(9, 16, 31, 0.72);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+}
+
+.fullscreenButton:hover,
+.fullscreenButton.active {
+  border-color: rgba(246, 196, 83, 0.74);
+  background: rgba(21, 36, 60, 0.86);
+}
+
+.fullscreenButton svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.stageFrame:fullscreen .sceneCaption {
+  max-width: min(560px, calc(100% - 96px));
 }
 
 .sceneCaption strong {
