@@ -31,6 +31,17 @@ const concepts = [
   ["Flyby", "A close pass around the Moon. Artemis II tests the crew spacecraft without landing."],
 ];
 
+const briefingIntel = {
+  launch: ["Watch the rocket hand Orion its first giant push away from Earth.", "The mission starts by building enough speed and height to safely reach orbit.", "Find Earth first, then look for Orion just outside the bright atmosphere."],
+  orbit: ["Look for Orion looping close to Earth before it commits to deep space.", "Staying close gives the crew and ground teams time to check every major system.", "Pause here and compare the small spacecraft to the size of Earth."],
+  tli: ["Watch for the bright engine plume as Orion leaves Earth orbit.", "One carefully timed burn changes the whole path from orbiting Earth to coasting toward the Moon.", "Switch to Follow view and see how the ship points along the curved path."],
+  coast: ["The ship is mostly gliding while tiny corrections keep the target lined up.", "Spacecraft often travel by coasting after a burn instead of firing engines all the time.", "Use the scrubber slowly here and notice that the path is not a flat circle."],
+  flyby: ["Orion passes the Moon without landing and lets lunar gravity bend its route.", "This close pass is the mission's big deep-space navigation test.", "Switch to Moon view and watch how the return loop wraps around the Moon."],
+  return: ["The path is already aimed back toward Earth, even without a huge rescue burn.", "A free-return style path gives the crew a safer way home if something goes wrong.", "Follow the yellow trail back from the Moon toward Earth."],
+  entry: ["The crew module meets Earth's atmosphere at very high speed.", "Air acts like a brake, turning speed into heat before parachutes can work.", "Look for the orange entry glow around Orion near Earth."],
+  splashdown: ["The mission ends over the ocean where recovery teams can reach Orion.", "Water recovery gives a wide, forgiving landing area after the long trip home.", "Scrub back to launch and compare the full path from start to finish."],
+};
+
 document.querySelector("#root").innerHTML = `
   <main class="shell">
     <section class="stagePanel">
@@ -58,9 +69,33 @@ document.querySelector("#root").innerHTML = `
         <label class="speedControl"><span>View</span><select id="viewSelect" aria-label="Camera view"><option value="cinematic" selected>Cinematic</option><option value="follow">Follow</option><option value="earth">Earth</option><option value="moon">Moon</option><option value="manual">Manual</option></select></label>
       </div>
     </section>
-    <aside class="learningPanel" aria-label="Mission explanation panel">
-      <div class="dialogHeader"><div><p class="eyebrow">Kid-friendly mission notes</p><h2 id="dialogTitle"></h2></div><button class="iconButton muted" id="dialogToggle" type="button" aria-label="Toggle explanation">Info</button></div>
-      <div class="dialog" id="dialog"><div class="bookIcon">?</div><p id="dialogText"></p></div>
+    <aside class="learningPanel intelPanel" aria-label="Mission intelligence panel">
+      <div class="intelHeader">
+        <div><p class="eyebrow">Mission intelligence</p><h2>Flight Director</h2></div>
+        <span class="completePill">Animation v1 complete</span>
+      </div>
+      <div class="modeSwitch" aria-label="Briefing mode">
+        <button type="button" id="holdBriefingButton">Hold briefing</button>
+        <button type="button" id="syncBriefingButton">Follow Orion</button>
+      </div>
+      <article class="briefingCard">
+        <div class="briefingMeta">
+          <span id="briefingDay"></span>
+          <strong id="briefingLabel"></strong>
+          <em id="briefingModeLabel"></em>
+        </div>
+        <h3 id="briefingTitle"></h3>
+        <p id="briefingText"></p>
+        <div class="briefingGrid">
+          <article><span>Watch</span><p id="watchText"></p></article>
+          <article><span>Why it matters</span><p id="whyText"></p></article>
+          <article><span>Try this</span><p id="tryText"></p></article>
+        </div>
+        <div class="briefingActions">
+          <button class="iconButton muted" type="button" id="briefingPrevButton">Prev briefing</button>
+          <button class="iconButton muted" type="button" id="briefingNextButton">Next briefing</button>
+        </div>
+      </article>
       <div class="conceptList">${concepts.map(([title, body]) => `<article class="conceptCard"><div class="conceptIcon"></div><div><h3>${title}</h3><p>${body}</p></div></article>`).join("")}</div>
       <p class="sourceNote">Reference: NASA SVS flight-derived trajectory, NASA AROW ephemeris, and NASA Artemis II press kit. Distances are compressed for screen learning.</p>
       <div class="missionList" id="missionList"></div>
@@ -69,7 +104,7 @@ document.querySelector("#root").innerHTML = `
 `;
 
 const dom = Object.fromEntries(
-  ["activeDay", "activeLabel", "captionTitle", "captionShort", "dialogTitle", "dialogText", "dialog", "dialogToggle", "scrubber", "playButton", "restartButton", "prevButton", "nextButton", "speedSelect", "viewSelect", "fullscreenButton", "timelineMarkers", "missionList"].map((id) => [id, document.querySelector(`#${id}`)])
+  ["activeDay", "activeLabel", "captionTitle", "captionShort", "briefingDay", "briefingLabel", "briefingModeLabel", "briefingTitle", "briefingText", "watchText", "whyText", "tryText", "holdBriefingButton", "syncBriefingButton", "briefingPrevButton", "briefingNextButton", "scrubber", "playButton", "restartButton", "prevButton", "nextButton", "speedSelect", "viewSelect", "fullscreenButton", "timelineMarkers", "missionList"].map((id) => [id, document.querySelector(`#${id}`)])
 );
 
 const state = {
@@ -77,7 +112,8 @@ const state = {
   playing: true,
   speed: 1,
   view: localStorage.getItem("artemis-three-view") || "cinematic",
-  dialogOpen: true,
+  briefingMode: localStorage.getItem("artemis-briefing-mode") || "hold",
+  selectedId: localStorage.getItem("artemis-briefing-id") || "launch",
 };
 
 // Screen-compressed schematic, shaped from official NASA Artemis II references:
@@ -115,11 +151,14 @@ let lastActiveId = null;
 let composer = null;
 const markerRefs = [];
 
-dom.timelineMarkers.innerHTML = milestones.map((item) => `<button class="marker" data-milestone="${item.id}" style="left:${item.t}%" type="button" aria-label="Jump to ${item.label}"><span>${item.label}</span></button>`).join("");
-dom.missionList.innerHTML = milestones.map((item) => `<button class="missionItem" data-milestone="${item.id}" type="button"><span>${item.day}</span><strong>${item.label}</strong></button>`).join("");
-document.querySelectorAll("[data-milestone]").forEach((button) => {
-  const item = milestones.find((milestone) => milestone.id === button.dataset.milestone);
-  button.addEventListener("click", () => jumpTo(item.t));
+dom.timelineMarkers.innerHTML = milestones.map((item) => `<button class="marker" data-jump="${item.id}" style="left:${item.t}%" type="button" aria-label="Jump to ${item.label}"><span>${item.label}</span></button>`).join("");
+dom.missionList.innerHTML = milestones.map((item) => `<button class="missionItem" data-briefing="${item.id}" type="button"><span>${item.day}</span><strong>${item.label}</strong><em></em></button>`).join("");
+document.querySelectorAll("[data-jump]").forEach((button) => {
+  const item = milestones.find((milestone) => milestone.id === button.dataset.jump);
+  button.addEventListener("click", () => jumpTo(item.t, item.id));
+});
+document.querySelectorAll("[data-briefing]").forEach((button) => {
+  button.addEventListener("click", () => selectBriefing(button.dataset.briefing));
 });
 dom.scrubber.addEventListener("input", (event) => setTime(Number(event.target.value), true));
 dom.playButton.addEventListener("click", () => {
@@ -127,8 +166,14 @@ dom.playButton.addEventListener("click", () => {
   updateDom();
 });
 dom.restartButton.addEventListener("click", () => jumpTo(0));
-dom.prevButton.addEventListener("click", () => jumpTo(milestones[clamp(activeIndex() - 1, 0, milestones.length - 1)].t));
-dom.nextButton.addEventListener("click", () => jumpTo(milestones[clamp(activeIndex() + 1, 0, milestones.length - 1)].t));
+dom.prevButton.addEventListener("click", () => {
+  const item = milestones[clamp(activeIndex() - 1, 0, milestones.length - 1)];
+  jumpTo(item.t, item.id);
+});
+dom.nextButton.addEventListener("click", () => {
+  const item = milestones[clamp(activeIndex() + 1, 0, milestones.length - 1)];
+  jumpTo(item.t, item.id);
+});
 dom.speedSelect.addEventListener("change", (event) => {
   state.speed = Number(event.target.value);
 });
@@ -136,10 +181,10 @@ dom.viewSelect.addEventListener("change", (event) => {
   state.view = event.target.value;
   localStorage.setItem("artemis-three-view", state.view);
 });
-dom.dialogToggle.addEventListener("click", () => {
-  state.dialogOpen = !state.dialogOpen;
-  updateDom();
-});
+dom.holdBriefingButton.addEventListener("click", () => setBriefingMode("hold"));
+dom.syncBriefingButton.addEventListener("click", () => setBriefingMode("follow"));
+dom.briefingPrevButton.addEventListener("click", () => stepBriefing(-1));
+dom.briefingNextButton.addEventListener("click", () => stepBriefing(1));
 dom.fullscreenButton.addEventListener("click", toggleFullscreen);
 document.addEventListener("fullscreenchange", () => {
   updateFullscreenButton();
@@ -825,25 +870,72 @@ function setTime(time, pause = false) {
   updateDom();
 }
 
-function jumpTo(time) {
-  state.dialogOpen = true;
+function jumpTo(time, id = null) {
+  if (id) selectBriefing(id, false);
   setTime(time, true);
+}
+
+function selectBriefing(id, render = true) {
+  state.selectedId = id;
+  state.briefingMode = "hold";
+  localStorage.setItem("artemis-briefing-id", state.selectedId);
+  localStorage.setItem("artemis-briefing-mode", state.briefingMode);
+  if (render) updateDom();
+}
+
+function setBriefingMode(mode) {
+  state.briefingMode = mode;
+  if (mode === "follow") state.selectedId = milestones[activeIndex()].id;
+  localStorage.setItem("artemis-briefing-mode", state.briefingMode);
+  localStorage.setItem("artemis-briefing-id", state.selectedId);
+  updateDom();
+}
+
+function stepBriefing(direction) {
+  const selected = selectedIndex();
+  const next = milestones[clamp(selected + direction, 0, milestones.length - 1)];
+  selectBriefing(next.id);
 }
 
 function updateDom() {
   const active = milestones[activeIndex()];
+  if (state.briefingMode === "follow") state.selectedId = active.id;
+  const briefing = selectedMilestone();
+  const [watch, why, task] = briefingIntel[briefing.id];
   dom.activeDay.textContent = active.day;
   dom.activeLabel.textContent = active.label;
   dom.captionTitle.textContent = active.title;
   dom.captionShort.textContent = active.short;
-  dom.dialogTitle.textContent = active.title;
-  dom.dialogText.textContent = active.dialog;
+  dom.briefingDay.textContent = briefing.day;
+  dom.briefingLabel.textContent = briefing.label;
+  dom.briefingModeLabel.textContent = briefing.id === active.id ? "Now in view" : "Briefing held";
+  dom.briefingTitle.textContent = briefing.title;
+  dom.briefingText.textContent = briefing.dialog;
+  dom.watchText.textContent = watch;
+  dom.whyText.textContent = why;
+  dom.tryText.textContent = task;
   dom.scrubber.value = String(state.time);
   dom.playButton.textContent = state.playing ? "Pause" : "Play";
   dom.playButton.setAttribute("aria-label", state.playing ? "Pause" : "Play");
   dom.viewSelect.value = state.view;
-  dom.dialog.hidden = !state.dialogOpen;
-  document.querySelectorAll("[data-milestone]").forEach((button) => button.classList.toggle("active", button.dataset.milestone === active.id));
+  dom.holdBriefingButton.classList.toggle("active", state.briefingMode === "hold");
+  dom.syncBriefingButton.classList.toggle("active", state.briefingMode === "follow");
+  dom.briefingPrevButton.disabled = selectedIndex() === 0;
+  dom.briefingNextButton.disabled = selectedIndex() === milestones.length - 1;
+  document.querySelectorAll("[data-jump]").forEach((button) => button.classList.toggle("active", button.dataset.jump === active.id));
+  document.querySelectorAll("[data-briefing]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.briefing === active.id);
+    button.classList.toggle("selected", button.dataset.briefing === briefing.id);
+    button.querySelector("em").textContent = button.dataset.briefing === active.id ? "in view" : "";
+  });
+}
+
+function selectedMilestone() {
+  return milestones.find((item) => item.id === state.selectedId) || milestones[activeIndex()];
+}
+
+function selectedIndex() {
+  return milestones.findIndex((item) => item.id === selectedMilestone().id);
 }
 
 function smoothstep(edge0, edge1, value) {
