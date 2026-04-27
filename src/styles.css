@@ -1,6 +1,6 @@
 :root {
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    "Source Sans Pro", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #f4f7fb;
   background: #02050a;
   font-synthesis: none;
@@ -71,35 +71,9 @@ button {
   position: absolute;
   top: 30px;
   left: 30px;
+  right: 320px;
   z-index: 3;
-  display: flex;
-  align-items: flex-start;
-  gap: 26px;
   color: #f7f9fc;
-}
-
-.departmentMark {
-  display: grid;
-  grid-template-columns: 3px 1fr;
-  gap: 14px;
-  align-items: start;
-  min-width: 210px;
-}
-
-.departmentMark span {
-  width: 3px;
-  height: 66px;
-  border-radius: 99px;
-  background: #e7b95a;
-  box-shadow: 0 0 22px rgba(231, 185, 90, 0.28);
-}
-
-.departmentMark p {
-  margin: 0;
-  color: rgba(247, 249, 252, 0.92);
-  font-size: 0.86rem;
-  font-weight: 700;
-  line-height: 1.28;
 }
 
 h1,
@@ -111,11 +85,13 @@ p {
 
 h1 {
   margin: 0;
-  max-width: 760px;
+  max-width: 720px;
   color: #f7f9fc;
-  font-size: clamp(2rem, 3vw, 3.25rem);
-  font-weight: 600;
-  line-height: 1.02;
+  font-family:
+    "Source Sans Pro", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: clamp(1.9rem, 2.72vw, 2.95rem);
+  font-weight: 700;
+  line-height: 1;
   letter-spacing: 0;
 }
 
@@ -130,7 +106,9 @@ h1 {
 }
 
 .roundButton,
-.roundSelect {
+.roundSelect,
+.almaExitButton,
+.languageButton {
   width: 48px;
   height: 48px;
   display: grid;
@@ -143,6 +121,19 @@ h1 {
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
 }
 
+.languageButton {
+  padding: 0;
+  overflow: hidden;
+}
+
+.languageButton img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
 .roundButton {
   padding: 0;
   font-size: 1rem;
@@ -153,6 +144,49 @@ h1 {
   width: 20px;
   height: 20px;
   fill: currentColor;
+}
+
+.almaExitButton {
+  position: relative;
+  display: none;
+  padding: 0;
+  color: #0a1019;
+  background: rgba(240, 195, 97, 0.92);
+  border-color: rgba(240, 195, 97, 0.84);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.28),
+    0 0 28px rgba(240, 195, 97, 0.2);
+}
+
+.almaExitButton.visible {
+  display: grid;
+}
+
+.almaExitButton svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.almaExitButton::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 1px solid rgba(240, 195, 97, 0.38);
+  border-radius: inherit;
+  animation: almaExitPulse 1.8s ease-out infinite;
+}
+
+@keyframes almaExitPulse {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.9);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.24);
+  }
 }
 
 .roundSelect {
@@ -182,6 +216,193 @@ h1 {
   opacity: 0;
 }
 
+.chilePanel {
+  position: absolute;
+  top: 92px;
+  right: 30px;
+  z-index: 4;
+  width: min(430px, calc(100vw - 60px));
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(208, 219, 231, 0.2);
+  border-radius: 10px;
+  padding: 14px;
+  color: #f7f9fc;
+  background:
+    linear-gradient(180deg, rgba(16, 24, 36, 0.46), rgba(6, 10, 16, 0.3)),
+    rgba(5, 8, 14, 0.18);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.chilePanel.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.chilePanelHeader {
+  display: grid;
+  gap: 3px;
+}
+
+.chilePanelHeader span {
+  color: #f0c361;
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chilePanelHeader strong {
+  font-size: 1.08rem;
+  line-height: 1.1;
+}
+
+.chileItem {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(208, 219, 231, 0.14);
+}
+
+.chileMedia {
+  position: relative;
+  width: 104px;
+  height: 76px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(208, 219, 231, 0.18);
+  border-radius: 6px;
+  color: inherit;
+  background: rgba(5, 8, 14, 0.36);
+  cursor: zoom-in;
+}
+
+.chileMedia img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.chileMedia em {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 12px;
+  z-index: 1;
+  display: none;
+  color: rgba(247, 249, 252, 0.76);
+  font-size: 0.78rem;
+  font-style: normal;
+  line-height: 1.36;
+  text-align: left;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.72);
+}
+
+.chileItem strong {
+  display: block;
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.chileItem p {
+  margin: 7px 0 0;
+  color: rgba(235, 241, 248, 0.82);
+  font-size: 0.78rem;
+  line-height: 1.42;
+}
+
+.chileLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.chileLinks a,
+.chileLinks button {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(208, 219, 231, 0.22);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: rgba(235, 241, 248, 0.88);
+  background: rgba(8, 13, 20, 0.36);
+  font-size: 0.68rem;
+  font-weight: 750;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.chileLinks button {
+  color: #0a1019;
+  background: rgba(240, 195, 97, 0.86);
+}
+
+.chileImageOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.chileImageOverlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.chileImageBackdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 5, 10, 0.42);
+  cursor: zoom-out;
+}
+
+.chileImageFigure {
+  position: relative;
+  width: min(960px, calc(100vw - 44px));
+  margin: 0;
+  border: 1px solid rgba(240, 195, 97, 0.42);
+  border-radius: 10px;
+  padding: 12px;
+  background:
+    linear-gradient(180deg, rgba(12, 17, 25, 0.34), rgba(5, 8, 14, 0.22)),
+    rgba(5, 8, 14, 0.24);
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.46);
+}
+
+.chileImageFigure img {
+  width: 100%;
+  max-height: calc(100vh - 120px);
+  display: block;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.chileImageFigure figcaption {
+  position: absolute;
+  left: 26px;
+  right: 26px;
+  bottom: 22px;
+  color: rgba(247, 249, 252, 0.78);
+  font-size: 0.78rem;
+  line-height: 1.36;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.72);
+}
+
 .sceneCards {
   position: absolute;
   inset: 0;
@@ -193,21 +414,21 @@ h1 {
   position: absolute;
   left: var(--card-x, 50%);
   top: var(--card-y, 50%);
-  width: 340px;
-  min-height: 172px;
+  width: var(--card-width, 390px);
+  min-height: var(--card-height, 214px);
   display: grid;
-  grid-template-columns: 34px 1fr;
-  gap: 3px 14px;
+  grid-template-columns: 116px 1fr;
+  gap: 14px;
   text-align: left;
-  border: 1px solid rgba(208, 219, 231, 0.34);
+  border: 1px solid rgba(208, 219, 231, 0.22);
   border-radius: 8px;
-  padding: 18px;
+  padding: 14px;
   color: #f7f9fc;
   background:
-    linear-gradient(180deg, rgba(17, 24, 34, 0.72), rgba(7, 12, 20, 0.54)),
-    rgba(8, 13, 20, 0.58);
-  backdrop-filter: blur(20px);
-  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.28);
+    linear-gradient(180deg, rgba(17, 24, 34, 0.18), rgba(7, 12, 20, 0.1)),
+    rgba(8, 13, 20, 0.12);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.12);
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, calc(-50% + 16px)) scale(0.96);
@@ -216,6 +437,9 @@ h1 {
     border-color 180ms ease,
     background 180ms ease,
     transform 420ms cubic-bezier(0.2, 0.72, 0.22, 1) var(--card-delay, 0ms);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   will-change: transform, opacity;
 }
 
@@ -223,6 +447,15 @@ h1 {
   opacity: 1;
   pointer-events: auto;
   transform: translate(-50%, -50%) scale(1);
+}
+
+.sceneCard.dragging,
+.sceneCard.resizing {
+  cursor: grabbing;
+  transition:
+    opacity 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease;
 }
 
 .sceneCard.offscreen {
@@ -234,8 +467,71 @@ h1 {
   display: none;
 }
 
-.sceneCard span {
+.sceneCardResizeHandle {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  border-right: 2px solid rgba(240, 195, 97, 0.68);
+  border-bottom: 2px solid rgba(240, 195, 97, 0.68);
+  border-radius: 0 0 4px 0;
+  cursor: nwse-resize;
+  opacity: 0.42;
+}
+
+.sceneCardResizeHandle::before {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid rgba(240, 195, 97, 0.72);
+  border-bottom: 1px solid rgba(240, 195, 97, 0.72);
+}
+
+.sceneCardResizeHandle:hover,
+.sceneCard.resizing .sceneCardResizeHandle {
+  opacity: 1;
+}
+
+.sceneCardMedia {
+  position: relative;
   grid-row: 1 / span 2;
+  width: 116px;
+  height: 128px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(208, 219, 231, 0.22);
+  border-radius: 6px;
+  background: rgba(5, 8, 14, 0.46);
+  color: inherit;
+  cursor: zoom-in;
+}
+
+.sceneCardMedia::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 44%, rgba(5, 8, 14, 0.62));
+  pointer-events: none;
+}
+
+.sceneCardMedia img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.sceneCardMedia span {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 1;
   width: 28px;
   height: 28px;
   display: grid;
@@ -247,13 +543,35 @@ h1 {
   background: #f0c361;
 }
 
+.sceneCardCaption {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 12px;
+  z-index: 1;
+  display: none;
+  margin: 0;
+  color: rgba(247, 249, 252, 0.76);
+  font-size: 0.78rem;
+  font-style: normal;
+  line-height: 1.36;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.72);
+}
+
+.sceneCardCopy {
+  min-width: 0;
+}
+
 .sceneCard strong {
+  display: block;
   color: #f7f9fc;
   font-size: 1.12rem;
   line-height: 1.15;
 }
 
-.sceneCard em {
+.sceneCardCopy em {
+  display: block;
+  margin-top: 4px;
   color: rgba(247, 249, 252, 0.8);
   font-size: 0.82rem;
   font-style: normal;
@@ -261,8 +579,7 @@ h1 {
 }
 
 .sceneCard p {
-  grid-column: 2;
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   color: rgba(235, 241, 248, 0.9);
   font-size: 0.92rem;
   line-height: 1.48;
@@ -288,12 +605,84 @@ h1 {
   text-transform: uppercase;
 }
 
+.sceneCardSources {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.sceneCardSources a,
+.sceneCardJump {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(208, 219, 231, 0.22);
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: rgba(235, 241, 248, 0.88);
+  background: rgba(8, 13, 20, 0.38);
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.sceneCardSources a:hover,
+.sceneCardJump:hover {
+  border-color: rgba(240, 195, 97, 0.62);
+  color: #f7f9fc;
+}
+
+.sceneCardJump {
+  color: #0a1019;
+  background: rgba(240, 195, 97, 0.88);
+}
+
 .sceneCard.active {
-  border-color: rgba(240, 195, 97, 0.58);
+  border-color: rgba(240, 195, 97, 0.46);
   background:
-    linear-gradient(180deg, rgba(18, 26, 38, 0.72), rgba(7, 12, 20, 0.56)),
-    rgba(11, 17, 25, 0.6);
+    linear-gradient(180deg, rgba(18, 26, 38, 0.2), rgba(7, 12, 20, 0.12)),
+    rgba(11, 17, 25, 0.14);
   transform: translate(-50%, -50%) scale(1);
+}
+
+.sceneCard.expanded {
+  z-index: 6;
+  width: min(var(--expanded-card-width, 760px), calc(100vw - 44px));
+  min-height: 0;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  background:
+    linear-gradient(180deg, rgba(12, 17, 25, 0.28), rgba(5, 8, 14, 0.18)),
+    rgba(5, 8, 14, 0.2);
+  cursor: default;
+}
+
+.sceneCard.expanded .sceneCardResizeHandle {
+  display: none;
+}
+
+.sceneCard.expanded .sceneCardMedia {
+  grid-row: auto;
+  width: 100%;
+  height: var(--expanded-image-height, 420px);
+  cursor: zoom-out;
+}
+
+.sceneCard.expanded .sceneCardMedia::after {
+  background: linear-gradient(180deg, transparent 62%, rgba(5, 8, 14, 0.76));
+}
+
+.sceneCard.expanded .sceneCardCopy,
+.sceneCard.expanded > small {
+  display: none;
+}
+
+.sceneCard.expanded .sceneCardCaption {
+  display: block;
 }
 
 .observationPanel {
@@ -689,7 +1078,13 @@ input:focus-visible {
   }
 
   .sceneCard {
-    width: 300px;
+    width: var(--card-width, 330px);
+    grid-template-columns: 96px 1fr;
+  }
+
+  .sceneCardMedia {
+    width: 96px;
+    height: 116px;
   }
 }
 
@@ -721,12 +1116,6 @@ input:focus-visible {
     top: 18px;
     left: 16px;
     right: 82px;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .departmentMark {
-    min-width: 0;
   }
 
   h1 {
@@ -741,15 +1130,43 @@ input:focus-visible {
   }
 
   .roundButton,
-  .roundSelect {
+  .roundSelect,
+  .almaExitButton,
+  .languageButton {
     width: 42px;
     height: 42px;
+  }
+
+  .chilePanel {
+    position: relative;
+    top: auto;
+    right: auto;
+    grid-row: 2;
+    width: auto;
+    margin: 0 14px 12px;
+  }
+
+  .chileItem {
+    grid-template-columns: 86px 1fr;
+  }
+
+  .chileMedia {
+    width: 86px;
+    height: 66px;
+  }
+
+  .chileImageOverlay {
+    padding: 14px;
+  }
+
+  .chileImageFigure {
+    width: calc(100vw - 28px);
   }
 
   .sceneCards {
     position: relative;
     inset: auto;
-    grid-row: 2;
+    grid-row: 3;
     z-index: 4;
     display: grid;
     grid-template-columns: 1fr;
@@ -769,7 +1186,19 @@ input:focus-visible {
     position: relative;
     inset: auto;
     width: 100%;
+    min-height: auto;
     transform: none;
+    cursor: pointer;
+    touch-action: auto;
+  }
+
+  .sceneCard {
+    grid-template-columns: 92px 1fr;
+  }
+
+  .sceneCardMedia {
+    width: 92px;
+    height: 108px;
   }
 
   .sceneCard.visible,
@@ -781,13 +1210,17 @@ input:focus-visible {
     display: none;
   }
 
+  .sceneCardResizeHandle {
+    display: none;
+  }
+
   .sceneCard:not(.visible) {
     display: none;
   }
 
   .observationPanel {
     position: relative;
-    grid-row: 3;
+    grid-row: 4;
     left: auto;
     bottom: auto;
     width: auto;
@@ -796,7 +1229,7 @@ input:focus-visible {
 
   .missionConsole {
     position: sticky;
-    grid-row: 4;
+    grid-row: 5;
     left: 14px;
     right: 14px;
     bottom: 14px;
