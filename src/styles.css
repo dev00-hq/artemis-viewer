@@ -193,18 +193,20 @@ h1 {
   position: absolute;
   left: var(--card-x, 50%);
   top: var(--card-y, 50%);
-  width: 250px;
-  min-height: 114px;
+  width: 340px;
+  min-height: 172px;
   display: grid;
-  grid-template-columns: 30px 1fr;
-  gap: 2px 12px;
+  grid-template-columns: 34px 1fr;
+  gap: 3px 14px;
   text-align: left;
   border: 1px solid rgba(208, 219, 231, 0.34);
   border-radius: 8px;
-  padding: 16px;
+  padding: 18px;
   color: #f7f9fc;
-  background: rgba(8, 13, 20, 0.56);
-  backdrop-filter: blur(18px);
+  background:
+    linear-gradient(180deg, rgba(17, 24, 34, 0.72), rgba(7, 12, 20, 0.54)),
+    rgba(8, 13, 20, 0.58);
+  backdrop-filter: blur(20px);
   box-shadow: 0 22px 58px rgba(0, 0, 0, 0.28);
   opacity: 0;
   pointer-events: none;
@@ -234,41 +236,63 @@ h1 {
 
 .sceneCard span {
   grid-row: 1 / span 2;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
   border-radius: 999px;
   color: #0a1019;
-  font-size: 0.8rem;
+  font-size: 0.84rem;
   font-weight: 900;
   background: #f0c361;
 }
 
 .sceneCard strong {
   color: #f7f9fc;
-  font-size: 1rem;
+  font-size: 1.12rem;
   line-height: 1.15;
 }
 
 .sceneCard em {
   color: rgba(247, 249, 252, 0.8);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-style: normal;
   font-weight: 700;
 }
 
 .sceneCard p {
   grid-column: 2;
-  margin: 7px 0 0;
-  color: rgba(225, 233, 243, 0.86);
-  font-size: 0.8rem;
+  margin: 10px 0 0;
+  color: rgba(235, 241, 248, 0.9);
+  font-size: 0.92rem;
+  line-height: 1.48;
+}
+
+.sceneCard small {
+  grid-column: 1 / -1;
+  display: block;
+  margin-top: 12px;
+  border-top: 1px solid rgba(208, 219, 231, 0.18);
+  padding-top: 11px;
+  color: rgba(211, 223, 235, 0.82);
+  font-size: 0.78rem;
   line-height: 1.42;
 }
 
+.sceneCard small b {
+  display: block;
+  margin-bottom: 4px;
+  color: #f0c361;
+  font-size: 0.68rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
 .sceneCard.active {
-  border-color: rgba(240, 195, 97, 0.62);
-  background: rgba(11, 17, 25, 0.62);
+  border-color: rgba(240, 195, 97, 0.58);
+  background:
+    linear-gradient(180deg, rgba(18, 26, 38, 0.72), rgba(7, 12, 20, 0.56)),
+    rgba(11, 17, 25, 0.6);
   transform: translate(-50%, -50%) scale(1);
 }
 
@@ -665,7 +689,7 @@ input:focus-visible {
   }
 
   .sceneCard {
-    width: 220px;
+    width: 300px;
   }
 }
 

@@ -39,6 +39,16 @@ const observationNotes = {
   splashdown: ["Recovery team", "After splashdown, the astronauts wait for recovery crews to secure Orion and bring them safely out of the capsule."],
 };
 
+const sceneCardLessons = {
+  launch: ["Getting above the air", "The rocket first has to climb out of Earth's thick atmosphere before Orion can begin the long trip.", "Look for Orion separating from the bright blue rim of Earth."],
+  orbit: ["Checking close to home", "The crew stays near Earth long enough to test navigation, power, air, and communication systems.", "Notice how the path loops safely near Earth before committing to deep space."],
+  tli: ["One push changes the route", "A precisely timed engine burn turns an Earth orbit into a Moon-bound path.", "Watch the path stop circling Earth and stretch outward."],
+  coast: ["Mostly gliding", "After the big burn, Orion coasts through space while small corrections keep it aimed correctly.", "Use the line as a quiet guide from Earth toward the Moon."],
+  flyby: ["Gravity bends the path", "Orion does not land here. It uses the Moon's gravity to turn around and start heading home.", "Follow the curve as it wraps around the Moon."],
+  return: ["The safe arc home", "The return path is shaped so gravity helps carry Orion back toward Earth.", "Watch Earth slowly become the main destination again."],
+  entry: ["Air becomes the brake", "Orion meets the upper atmosphere very fast, using air resistance to slow down before parachutes.", "Look for the glow near Earth's edge as the spacecraft comes home."],
+};
+
 const sceneCards = [
   ["launch", "cardLaunch"],
   ["orbit", "cardOrbit"],
@@ -47,7 +57,10 @@ const sceneCards = [
   ["flyby", "cardFlyby"],
   ["return", "cardReturn"],
   ["entry", "cardEntry"],
-].map(([id, className], index) => ({ ...milestones.find((item) => item.id === id), className, number: index + 1 }));
+].map(([id, className], index) => {
+  const lesson = sceneCardLessons[id];
+  return { ...milestones.find((item) => item.id === id), className, number: index + 1, lessonTitle: lesson[0], lessonBody: lesson[1], lessonCue: lesson[2] };
+});
 
 document.querySelector("#root").innerHTML = `
   <main class="missionShell">
@@ -70,7 +83,8 @@ document.querySelector("#root").innerHTML = `
             <span>${item.number}</span>
             <strong>${item.label}</strong>
             <em>${item.day}</em>
-            <p>${item.short}</p>
+            <p>${item.lessonBody}</p>
+            <small><b>${item.lessonTitle}</b>${item.lessonCue}</small>
           </button>
         `).join("")}
       </div>
@@ -1121,7 +1135,7 @@ function activeCardSlot(id, width, height) {
   };
   const [xRatio, yRatio] = slots[id] || [0.66, 0.42];
   return {
-    x: clamp(width * xRatio, 165, width - 165),
+    x: clamp(width * xRatio, 190, width - 190),
     y: clamp(height * yRatio, headerBottom + 72, consoleTop - 74),
   };
 }
