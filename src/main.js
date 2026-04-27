@@ -14,6 +14,8 @@ const MOON_MODEL_URL = "/assets/moon_nasa_lro_small.glb";
 const EARTH = new THREE.Vector3(-3.55, -0.1, 0);
 const MOON = new THREE.Vector3(4.75, 0.18, -1.1);
 const BASE_PLAYBACK_RATE = 4.35;
+const CAMERA_FOV = 28.8;
+const ORION_WORLD_SCALE = 0.2856;
 
 const milestones = [
   ["launch", 0, "Launch", "Apr 1", "Big rocket, careful start", "SLS lifted Orion and four astronauts away from Earth.", "Artemis II began with a giant rocket lifting Orion away from Earth. The rocket did the hard first push, like throwing a ball high enough that it can start a long trip."],
@@ -215,7 +217,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x050814);
 scene.fog = new THREE.Fog(0x050814, 11, 28);
 
-const camera = new THREE.PerspectiveCamera(39, 16 / 9, 0.1, 100);
+const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 16 / 9, 0.1, 100);
 camera.position.set(0.05, 1.28, 7.85);
 camera.lookAt(0.1, 0.12, -0.28);
 
@@ -433,8 +435,8 @@ function createDepthCues() {
 }
 
 function createTrajectory() {
-  scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 900, 0.013, 10, false), new THREE.MeshBasicMaterial({ color: 0x5fd8d4, transparent: true, opacity: 0.5 })));
-  scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 900, 0.004, 8, false), new THREE.MeshBasicMaterial({ color: 0xdfffff, transparent: true, opacity: 0.86 })));
+  scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 900, 0.0075, 8, false), new THREE.MeshBasicMaterial({ color: 0x5fd8d4, transparent: true, opacity: 0.34 })));
+  scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 900, 0.0024, 6, false), new THREE.MeshBasicMaterial({ color: 0xdfffff, transparent: true, opacity: 0.56 })));
   addDirectionChevrons();
 }
 
@@ -444,9 +446,9 @@ function createMarkers() {
   const markerGlowTexture = createRadialTexture("#fff0b3", "#f6c453");
   milestones.forEach((item) => {
     const marker = new THREE.Group();
-    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.045, 18, 18), item.id === "flyby" ? flybyMaterial : markerMaterial);
-    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: markerGlowTexture, transparent: true, opacity: item.id === "flyby" ? 0.62 : 0.46, blending: THREE.AdditiveBlending, depthWrite: false }));
-    glow.scale.set(0.26, 0.26, 1);
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.027, 16, 16), item.id === "flyby" ? flybyMaterial : markerMaterial);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: markerGlowTexture, transparent: true, opacity: item.id === "flyby" ? 0.38 : 0.28, blending: THREE.AdditiveBlending, depthWrite: false }));
+    glow.scale.set(0.14, 0.14, 1);
     marker.add(glow, dot);
     marker.position.copy(pointAt(item.t / DURATION));
     markerRefs.push({ id: item.id, mesh: marker, glow });
@@ -456,7 +458,7 @@ function createMarkers() {
 
 function createOrion() {
   const root = new THREE.Group();
-  root.scale.setScalar(0.56);
+  root.scale.setScalar(ORION_WORLD_SCALE);
   const {
     capsuleMat,
     heatMat,
@@ -664,15 +666,15 @@ function updateScene() {
   }
   trail = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(pathPoints.slice(0, Math.max(2, Math.floor(pathPoints.length * progress)))),
-    new THREE.LineBasicMaterial({ color: 0xf6c453, transparent: true, opacity: 0.95 })
+    new THREE.LineBasicMaterial({ color: 0xf6c453, transparent: true, opacity: 0.46 })
   );
   scene.add(trail);
 
   const active = milestones[activeIndex()];
   markerRefs.forEach((marker) => {
-    const activeScale = marker.id === active.id ? 1.45 : 1;
+    const activeScale = marker.id === active.id ? 1.22 : 0.82;
     marker.mesh.scale.setScalar(activeScale);
-    marker.glow.material.opacity = marker.id === active.id ? 0.78 : 0.38;
+    marker.glow.material.opacity = marker.id === active.id ? 0.42 : 0.18;
   });
   scene.userData.earth.rotation.y += 0.0022;
   scene.userData.cloudShell.rotation.y += 0.003;
@@ -693,19 +695,21 @@ function updateCamera(progress, point, tangent) {
     target = shot.target;
     position = shot.position;
   } else if (state.view === "earth") {
-    target = EARTH.clone().lerp(point, 0.2);
-    position = EARTH.clone().add(new THREE.Vector3(-0.75, 2.15, 4.35));
+    const shot = bodyTurnShot(EARTH, 1.18, point, tangent, { distance: 4.2, back: 0.72, lift: 1.35, centerWeight: 0.3 });
+    target = shot.target;
+    position = shot.position;
   } else if (state.view === "moon") {
-    target = MOON.clone().lerp(point, 0.25);
-    position = MOON.clone().add(new THREE.Vector3(1.7, 1.65, 3.25));
+    const shot = bodyTurnShot(MOON, 0.52, point, tangent, { distance: 2.5, back: 0.52, lift: 0.95, centerWeight: 0.24 });
+    target = shot.target;
+    position = shot.position;
   } else {
     const shot = cinematicShot(milestones[activeIndex()].id, progress, point, tangent);
     target = shot.target;
     position = shot.position;
   }
 
-  camera.position.lerp(position, 0.034);
-  orbit.target.lerp(target, 0.055);
+  camera.position.lerp(position, 0.04);
+  orbit.target.lerp(target, 0.06);
 }
 
 function cinematicShot(id, progress, point, tangent) {
@@ -715,38 +719,14 @@ function cinematicShot(id, progress, point, tangent) {
     Math.sin(progress * Math.PI * 1.3) * 0.08
   );
   const shots = {
-    launch: {
-      target: EARTH.clone().lerp(point, 0.32).add(new THREE.Vector3(0.52, 0.18, -0.1)),
-      position: EARTH.clone().add(new THREE.Vector3(3.15, 2.16, 5.7)),
-    },
-    orbit: {
-      target: EARTH.clone().lerp(point, 0.36).add(new THREE.Vector3(0.42, 0.06, -0.18)),
-      position: EARTH.clone().add(new THREE.Vector3(3.35, 1.95, 5.35)),
-    },
-    tli: {
-      target: EARTH.clone().lerp(point, 0.46).add(new THREE.Vector3(0.38, 0.24, -0.12)),
-      position: EARTH.clone().add(new THREE.Vector3(4.35, 2.32, 4.85)),
-    },
-    coast: {
-      target: EARTH.clone().lerp(MOON, 0.46).lerp(point, 0.38).add(new THREE.Vector3(-0.1, 0.22, 0.08)),
-      position: EARTH.clone().lerp(MOON, 0.44).add(new THREE.Vector3(-2.55, 2.52, 6.75)),
-    },
-    flyby: {
-      target: MOON.clone().lerp(point, 0.42).lerp(EARTH, 0.12).add(new THREE.Vector3(-0.22, 0.18, 0.06)),
-      position: MOON.clone().add(new THREE.Vector3(-3.15, 2.18, 4.72)),
-    },
-    return: {
-      target: EARTH.clone().lerp(point, 0.46).add(new THREE.Vector3(-0.22, 0.16, -0.02)),
-      position: EARTH.clone().add(new THREE.Vector3(-2.75, 2.34, 6.08)),
-    },
-    entry: {
-      target: EARTH.clone().lerp(point, 0.34).add(new THREE.Vector3(0.42, 0.0, 0.12)),
-      position: EARTH.clone().add(new THREE.Vector3(2.55, 1.68, 4.36)),
-    },
-    splashdown: {
-      target: EARTH.clone().lerp(point, 0.28).add(new THREE.Vector3(0.2, 0.08, 0.12)),
-      position: EARTH.clone().add(new THREE.Vector3(2.25, 1.5, 4.4)),
-    },
+    launch: bodyTurnShot(EARTH, 1.18, point, tangent, { distance: 4.75, back: 0.82, lift: 1.45, centerWeight: 0.36 }),
+    orbit: bodyTurnShot(EARTH, 1.18, point, tangent, { distance: 5.05, back: 0.92, lift: 1.52, centerWeight: 0.32 }),
+    tli: tliDepartureShot(progress, point, tangent),
+    coast: coastEstablishingShot(progress, point, tangent),
+    flyby: lunarFlybyShot(progress, point, tangent),
+    return: pathTravelShot(point, tangent, { distance: 4.8, side: 2.1, lift: 1.7, lookAhead: 0.62, earthContext: 0.08 }),
+    entry: bodyTurnShot(EARTH, 1.18, point, tangent, { distance: 4.3, back: 0.74, lift: 1.18, centerWeight: 0.34 }),
+    splashdown: bodyTurnShot(EARTH, 1.18, point, tangent, { distance: 4.1, back: 0.62, lift: 1.08, centerWeight: 0.36 }),
   };
   const shot = shots[id] || shots.coast;
   const forwardBreath = tangent.clone().multiplyScalar(0.08 * Math.sin(progress * Math.PI * 3.2));
@@ -756,10 +736,156 @@ function cinematicShot(id, progress, point, tangent) {
   };
 }
 
+function tliDepartureShot(progress, point, tangent) {
+  const earthSafe = bodyTurnShot(EARTH, 1.18, point, tangent, { distance: 5.5, back: 1.1, lift: 1.55, centerWeight: 0.26 });
+  const travel = pathTravelShot(point, tangent, { distance: 4.9, side: 1.85, lift: 1.58, lookAhead: 0.74, earthContext: 0.1 });
+  const release = smoothstep(0.3, 0.42, progress);
+  return blendShot(earthSafe, travel, release);
+}
+
+function coastEstablishingShot(progress, point, tangent) {
+  const travel = pathTravelShot(point, tangent, { distance: 4.9, side: 1.85, lift: 1.58, lookAhead: 0.74, earthContext: 0.1 });
+  const wide = {
+    target: EARTH.clone().lerp(MOON, 0.46).lerp(point, 0.38).add(new THREE.Vector3(-0.1, 0.22, 0.08)),
+    position: EARTH.clone().lerp(MOON, 0.44).add(new THREE.Vector3(-2.55, 2.52, 6.75)),
+  };
+  const approach = lunarApproachShot(progress, point, tangent);
+  const establish = smoothstep(0.42, 0.5, progress);
+  const approachMove = smoothstep(0.51, 0.58, progress);
+  return blendShot(blendShot(travel, wide, establish), approach, approachMove);
+}
+
+function lunarApproachShot(progress, point, tangent) {
+  return lunarTurnRailShot(progress, point, tangent, { distance: 5.45, back: 1.18, lift: 1.54, centerWeight: 0.16 }, 0.062);
+}
+
+function lunarFlybyShot(progress, point, tangent) {
+  const approach = lunarApproachShot(progress, point, tangent);
+  const safeMoon = lunarTurnRailShot(progress, point, tangent, { distance: 4.15, back: 0.92, lift: 1.24, centerWeight: 0.22 }, 0.044);
+  const travel = pathTravelShot(point, tangent, { distance: 4.9, side: 2.2, lift: 1.62, lookAhead: 0.7, earthContext: 0.04 });
+  const enter = smoothstep(0.58, 0.65, progress);
+  const exit = smoothstep(0.64, 0.72, progress);
+  return blendShot(blendShot(approach, safeMoon, enter), travel, exit);
+}
+
+function lunarTurnRailShot(progress, point, tangent, options, leadMax) {
+  const leadIn = smoothstep(0.49, 0.58, progress);
+  const leadOut = 1 - smoothstep(0.66, 0.74, progress);
+  const railProgress = progress + leadMax * leadIn * leadOut;
+  const railPoint = pointAt(railProgress);
+  const railTangent = tangentAt(railProgress);
+  const railShot = bodyTurnShot(MOON, 0.52, railPoint, railTangent, options);
+  const currentTarget = point.clone().add(tangent.clone().multiplyScalar(0.34)).lerp(MOON, options.centerWeight ?? 0.18);
+  return {
+    target: railShot.target.clone().lerp(currentTarget, 0.38),
+    position: railShot.position,
+  };
+}
+
+function tangentAt(progress) {
+  const before = pointAt(progress - 0.004);
+  const after = pointAt(progress + 0.004);
+  return after.sub(before).normalize();
+}
+
+function pathTravelShot(point, tangent, options = {}) {
+  const side = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0));
+  if (side.lengthSq() < 0.001) side.set(1, 0, 0);
+  side.normalize();
+  const lift = options.lift ?? 1.5;
+  const distance = options.distance ?? 4.4;
+  const sideDistance = options.side ?? 1.8;
+  const lookAhead = options.lookAhead ?? 0.5;
+  const earthContext = options.earthContext ?? 0;
+  const target = point
+    .clone()
+    .add(tangent.clone().multiplyScalar(lookAhead))
+    .lerp(EARTH, earthContext)
+    .add(new THREE.Vector3(0, 0.08, 0));
+  const position = point
+    .clone()
+    .add(tangent.clone().multiplyScalar(-distance))
+    .add(side.multiplyScalar(sideDistance))
+    .add(new THREE.Vector3(0, lift, 0));
+  return { target, position };
+}
+
+function blendShot(a, b, amount) {
+  const t = smoothstep(0, 1, amount);
+  return {
+    target: a.target.clone().lerp(b.target, t),
+    position: a.position.clone().lerp(b.position, t),
+  };
+}
+
+function bodyTurnShot(center, radius, point, tangent, options) {
+  const radial = point.clone().sub(center);
+  if (radial.lengthSq() < 0.001) radial.set(1, 0, 0);
+  radial.normalize();
+  const turnNormal = new THREE.Vector3().crossVectors(radial, tangent).normalize();
+  if (turnNormal.lengthSq() < 0.001) turnNormal.set(0, 1, 0);
+  if (turnNormal.y < 0) turnNormal.multiplyScalar(-1);
+  const distance = options.distance ?? 4.5;
+  const back = options.back ?? 0.8;
+  const lift = options.lift ?? 1.25;
+  const centerWeight = options.centerWeight ?? 0.3;
+  const position = center
+    .clone()
+    .add(radial.clone().multiplyScalar(radius + distance))
+    .add(tangent.clone().multiplyScalar(-back))
+    .add(turnNormal.multiplyScalar(lift));
+  const target = point
+    .clone()
+    .lerp(center, centerWeight)
+    .add(tangent.clone().multiplyScalar(0.16));
+  return keepShipInFrontOfBody({ center, radius, point, target, position });
+}
+
+function keepShipInFrontOfBody({ center, radius, point, target, position }) {
+  const toShip = point.clone().sub(center);
+  const toCamera = position.clone().sub(center);
+  if (toShip.lengthSq() < 0.001 || toCamera.lengthSq() < 0.001) return { target, position };
+  const sameHemisphere = toShip.normalize().dot(toCamera.normalize());
+  if (sameHemisphere < 0.18) {
+    const correction = point.clone().sub(center).normalize().multiplyScalar(radius + 4.8);
+    position.copy(center).add(correction).add(new THREE.Vector3(0, 1.25, 0));
+  }
+  return { target, position };
+}
+
 function cinematicFollowShot(id, progress, point, tangent, safeSide) {
-  const systemAnchor = id === "flyby" || id === "coast"
-    ? EARTH.clone().lerp(MOON, id === "flyby" ? 0.72 : 0.5)
-    : EARTH.clone().lerp(point, id === "return" || id === "entry" ? 0.42 : 0.28);
+  if (id === "launch" || id === "orbit" || id === "tli" || id === "entry" || id === "splashdown") {
+    const composed = cinematicShot(id, progress, point, tangent);
+    const safe = bodyTurnShot(EARTH, 1.18, point, tangent, { distance: 3.9, back: 0.66, lift: 1.34, centerWeight: 0.22 });
+    return {
+      target: composed.target.clone().lerp(safe.target, 0.68),
+      position: composed.position.clone().lerp(safe.position, 0.72),
+    };
+  }
+  if (id === "flyby") {
+    const composed = cinematicShot(id, progress, point, tangent);
+    const approach = lunarApproachShot(progress, point, tangent);
+    const safe = lunarTurnRailShot(progress, point, tangent, { distance: 3.65, back: 0.72, lift: 1.12, centerWeight: 0.18 }, 0.04);
+    const travel = pathTravelShot(point, tangent, { distance: 4.35, side: 1.9, lift: 1.62, lookAhead: 0.72, earthContext: 0.04 });
+    const enter = smoothstep(0.58, 0.65, progress);
+    const exit = smoothstep(0.64, 0.72, progress);
+    const release = blendShot(blendShot(approach, safe, enter), travel, exit);
+    return {
+      target: composed.target.clone().lerp(release.target, 0.72),
+      position: composed.position.clone().lerp(release.position, 0.76),
+    };
+  }
+  if (id === "return") {
+    const composed = cinematicShot(id, progress, point, tangent);
+    const travel = pathTravelShot(point, tangent, { distance: 4.35, side: 1.95, lift: 1.64, lookAhead: 0.66, earthContext: 0.06 });
+    return {
+      target: composed.target.clone().lerp(travel.target, 0.68),
+      position: composed.position.clone().lerp(travel.position, 0.72),
+    };
+  }
+  const systemAnchor = id === "coast"
+    ? EARTH.clone().lerp(MOON, 0.5)
+    : EARTH.clone().lerp(point, id === "return" ? 0.42 : 0.28);
   const composed = cinematicShot(id, progress, point, tangent);
   const chaseTarget = point.clone().add(tangent.clone().multiplyScalar(0.42)).lerp(systemAnchor, 0.28);
   const chasePosition = point
@@ -778,11 +904,11 @@ function enginePulse(time, centers = [0, 24, 42, 73], width = 3.2) {
 }
 
 function addDirectionChevrons() {
-  const material = new THREE.MeshBasicMaterial({ color: 0xf6c453, transparent: true, opacity: 0.72 });
+  const material = new THREE.MeshBasicMaterial({ color: 0xf6c453, transparent: true, opacity: 0.42 });
   [0.18, 0.34, 0.5, 0.68, 0.84].forEach((t) => {
     const point = pointAt(t);
     const tangent = pointAt(Math.min(1, t + 0.01)).sub(pointAt(Math.max(0, t - 0.01))).normalize();
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.15, 18), material);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.095, 16), material);
     cone.position.copy(point);
     cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
     scene.add(cone);
