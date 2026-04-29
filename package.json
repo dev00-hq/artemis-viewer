@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:dry-run": "npm run build && wrangler deploy --dry-run",
     "ralph": "node scripts/ralph-loop.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },
@@ -17,6 +19,7 @@
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "pixelmatch": "^7.1.0",
-    "pngjs": "^7.0.0"
+    "pngjs": "^7.0.0",
+    "wrangler": "^4.86.0"
   }
 }
